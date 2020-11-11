@@ -10,6 +10,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+def conductivity(k_left, k_right, d_CV, d_N):
+    f = 0.5 * d_N / d_CV
+    k = f * k_left + (1-f)*k_right     
+    return k
+
+
+
 #===================== Schematic ==================
 #
 #                  0----------------0
@@ -59,15 +66,15 @@ c2 = 0.25
  
 # Geometric inputs
 
-mI = 40 # number of mesh points X direction.
-mJ = 40 # number of mesh points Y direction.
+mI = 20 # number of mesh points X direction.
+mJ = 20 # number of mesh points Y direction.
 grid_type = 'equidistant' # this sets equidistant mesh sizing or non-equidistant
 xL = 1 # length of the domain in X direction
 yL = 1 # length of the domain in Y direction
 
 # Solver inputs
 
-nIterations  = 100 # maximum number of iterations
+nIterations  = 400 # maximum number of iterations
 resTolerance =  0.001 # convergence criteria for residuals each variable
 
 #====================== Code ======================
@@ -111,6 +118,8 @@ if grid_type == 'equidistant':
     dy = yL/(mJ - 1)
     
 
+    xCoords_N[nI-1,nJ-1] = xL + dx/2  
+    yCoords_N[nI-1,nJ-1] = yL + dy/2
     # Fill the coordinates
     for i in range(mI):
         for j in range(mJ):
@@ -142,12 +151,19 @@ if grid_type == 'equidistant':
             if i>0:
                 dx_CV[i,j] = xCoords_M[i,j] - xCoords_M[i-1,j]
             if j>0:
-                dy_CV[i,j] = yCoords_M[i,j] - yCoords_M[i,j-1]
-print(dx_CV)    
-print(dy_CV)
-print(xCoords_N)      
-xCoords_N[nI-1,nJ-1] = xL + dx/2  
-yCoords_N[nI-1,nJ-1] = yL + dy/2    
+                dy_CV[i,j] = yCoords_M[i,j] - yCoords_M[i,j-1]  
+                
+
+    for i in range(mI):
+        for j in range(mJ):
+                # Fill dx_N and dy_N
+                if i>0:
+                    dxw_N[i,j] = xCoords_N[i,j] - xCoords_N[i-1,j]
+                    dxe_N[i,j] = xCoords_N[i+1,j] - xCoords_N[i,j]
+                if j>0:
+                    dys_N[i,j] = yCoords_N[i,j] - yCoords_N[i,j-1]
+                    dyn_N[i,j] = yCoords_N[i,j+1] - yCoords_N[i,j]
+
 # =============================================================================
 # elif grid_type == 'non-equidistant':
 #     rx = 1.15
@@ -195,25 +211,27 @@ for iter in range(nIterations):
             k[i,j] = 2*(1+20*T[i,j]/T1)                         ############### FIX
         
             # Update source term matrix according to your case
-            S_U[i,j] = 15 * (c1 -c2 * T[i,j]) * dx * dy    # In loop          ################# FIX
-            S_P[i,j] = -c2 * T[i,j]**2 * dx * dy
+            #S_U[i,j] = 15 * (c1 -c2 * T[i,j]) * dx * dy    # In loop          ################# FIX
+            #S_P[i,j] = -c2 * T[i,j]**2 * dx * dy
             
     # Compute coeffsT for all the nodes which are not boundary nodes
     ## Compute coefficients for nodes one step inside the domain
     
     ### First, north and south boundaries
     for i in range(2,nI-2):
-        coeffsT[i,1,0] = k_w * dy_CV[i,1]/dx_CV[i,1]
-        coeffsT[i,1,1] = k_e * dy_CV[i,1]/dx_CV[i,1]
+        coeffsT[i,1,0] = conductivity(k[i-1,1], k[i,1], dx_CV[i,1], dxw_N[i,1]) * dy_CV[i,1]/dx_CV[i,1]
+        coeffsT[i,1,1] = conductivity(k[i,1], k[i+1,1], dx_CV[i,1], dxe_N[i,1]) * dy_CV[i,1]/dx_CV[i,1]
         coeffsT[i,1,2] = 0 
+        k_s = conductivity(k[i,0], k[i,1], dy_CV[i,1], dys_N[i,1])
         S_U[i,1] += 2 * k_s * dx_CV[i,1] * T1 / dy_CV[i,1]                   # Work for non-equi?
         S_P[i,1] += -2 * k_s * dx_CV[i,1] / dy_CV[i,1]####
-        coeffsT[i,1,3] = k_n * dx_CV[i,1]/dy_CV[i,1]
+        coeffsT[i,1,3] = conductivity(k[i,1], k[i,2], dy_CV[i,1], dyn_N[i,1]) * dx_CV[i,1]/dy_CV[i,1]
         
-        coeffsT[i,nJ-2,0] = k_w * dy_CV[i,nJ-2]/dx_CV[i,nJ-2]
-        coeffsT[i,nJ-2,1] = k_e * dy_CV[i,nJ-2]/dx_CV[i,nJ-2]
-        coeffsT[i,nJ-2,2] = k_s * dx_CV[i,nJ-2]/dy_CV[i,nJ-2]
+        coeffsT[i,nJ-2,0] = conductivity(k[i-1,nJ-2], k[i,nJ-2], dx_CV[i,nJ-2], dxw_N[i,nJ-2]) * dy_CV[i,nJ-2]/dx_CV[i,nJ-2]
+        coeffsT[i,nJ-2,1] = conductivity(k[i,nJ-2], k[i+1,nJ-2], dx_CV[i,nJ-2], dxe_N[i,nJ-2]) * dy_CV[i,nJ-2]/dx_CV[i,nJ-2]
+        coeffsT[i,nJ-2,2] = conductivity(k[i,nJ-3], k[i,nJ-2], dy_CV[i,nJ-2], dys_N[i,nJ-2]) * dx_CV[i,nJ-2]/dy_CV[i,nJ-2]
         coeffsT[i,nJ-2,3] = 0
+        k_n = conductivity(k[i,nJ-2], k[i,nJ-1], dy_CV[i,nJ-2], dyn_N[i,nJ-2])
         S_U[i,nJ-2] += 2 * k_n * dx_CV[i,nJ-2] * T[i,nJ-1] / dy_CV[i,nJ-2]    # Work for non-equi? T is T3
         S_P[i,nJ-2] += -2 * k_n * dx_CV[i,nJ-2] / dy_CV[i,nJ-2]####
         
@@ -221,61 +239,68 @@ for iter in range(nIterations):
     for j in range(2,nJ-2):
         coeffsT[1,j,0] = 0
         S_U[1,j] = 0                     # Zero when neumann cond.
-        coeffsT[1,j,1] = k_e * dy_CV[1,j]/dx_CV[1,j]
-        coeffsT[1,j,2] = k_s * dx_CV[1,j]/dy_CV[1,j]
-        coeffsT[1,j,3] = k_n * dx_CV[1,j]/dy_CV[1,j]
+        coeffsT[1,j,1] = conductivity(k[1,j], k[2,j], dx_CV[1,j], dxe_N[1,j]) * dy_CV[1,j]/dx_CV[1,j]
+        coeffsT[1,j,2] = conductivity(k[1,j-1], k[1,j], dy_CV[1,j], dys_N[1,j]) * dx_CV[1,j]/dy_CV[1,j]
+        coeffsT[1,j,3] = conductivity(k[1,j], k[1,j+1], dy_CV[1,j], dyn_N[1,j]) * dx_CV[1,j]/dy_CV[1,j]
         
-        coeffsT[nI-2,j,0] = k_w * dy_CV[nI-2,j]/dx_CV[nI-2,j]
+        coeffsT[nI-2,j,0] = conductivity(k[nI-3,j], k[nI-2,j], dx_CV[nI-2,j], dxw_N[nI-2,j]) * dy_CV[nI-2,j]/dx_CV[nI-2,j]
         coeffsT[nI-2,j,1] = 0
+        k_e = conductivity(k[nI-2,j], k[nI-1,j], dx_CV[nI-2,j], dxe_N[nI-2,j])
         S_U[nI-2,j] += 2 * k_e * dy_CV[nI-2,j] * T2 / dx_CV[nI-2,j]
         S_P[nI-2,j] += -2 * k_e * dy_CV[nI-2,j] / dx_CV[nI-2,j]####
-        coeffsT[nI-2,j,2] = k_s * dx_CV[nI-2,j]/dy_CV[nI-2,j]
-        coeffsT[nI-2,j,3] = k_n * dx_CV[nI-2,j]/dy_CV[nI-2,j]
+        coeffsT[nI-2,j,2] = conductivity(k[nI-2,j-1], k[nI-2,j], dy_CV[nI-2,j], dys_N[nI-2,j]) * dx_CV[nI-2,j]/dy_CV[nI-2,j]
+        coeffsT[nI-2,j,3] = conductivity(k[nI-2,j], k[nI-2,j+1], dy_CV[nI-2,j], dyn_N[nI-2,j]) * dx_CV[nI-2,j]/dy_CV[nI-2,j]
         
     ## Compute coefficients for inner nodes
     for i in range(2,nI-2):
         for j in range(2,nJ-2): # This is not done for all! # Index change? Unsure
-            coeffsT[i,j,0] = k_w * dy_CV[i,j]/dx_CV[i,j]
-            coeffsT[i,j,1] = k_e * dy_CV[i+1,j]/dx_CV[i+1,j]
-            coeffsT[i,j,2] = k_s * dx_CV[i,j]/dy_CV[i,j]
-            coeffsT[i,j,3] = k_n * dx_CV[i,j+1]/dy_CV[i,j+1]
+            coeffsT[i,j,0] = conductivity(k[i-1,j], k[i,j], dx_CV[i,j], dxw_N[i,j]) * dy_CV[i,j]/dx_CV[i,j]
+            coeffsT[i,j,1] = conductivity(k[i,j], k[i+1,j], dx_CV[i,j], dxe_N[i,j]) * dy_CV[i+1,j]/dx_CV[i+1,j]
+            coeffsT[i,j,2] = conductivity(k[i,j-1], k[i,j], dy_CV[i,j], dys_N[i,j]) * dx_CV[i,j]/dy_CV[i,j]
+            coeffsT[i,j,3] = conductivity(k[i,j], k[i,j+1], dy_CV[i,j], dyn_N[i,j]) * dx_CV[i,j+1]/dy_CV[i,j+1]
             
     ## Compute coefficients corner nodes (one step inside)
     # S-W corner
     coeffsT[1,1,0] = 0 
     S_U[1,1] += 0
-    coeffsT[1,1,1] = k_e * dy_CV[1,1]/dx_CV[1,1]
+    coeffsT[1,1,1] = conductivity(k[1,1], k[2,1], dx_CV[1,1], dxe_N[1,1]) * dy_CV[1,1]/dx_CV[1,1]
     coeffsT[1,1,2] = 0
+    k_s = conductivity(k[1,0], k[1,1], dy_CV[1,1], dys_N[1,1])
     S_U[1,1] += 2 * k_s * dx_CV[1,1] * T1 / dy_CV[1,1]
     S_P[1,1] += -2 * k_s * dx_CV[1,1] / dy_CV[1,1]####
-    coeffsT[1,1,3] = k_n * dx_CV[1,1]/dy_CV[1,1]
+    coeffsT[1,1,3] = conductivity(k[1,1], k[1,2], dy_CV[1,1], dyn_N[1,1]) * dx_CV[1,1]/dy_CV[1,1]
     
     # S-E corner
-    coeffsT[nI-2,1,0] = k_w * dy_CV[nI-2,1]/dx_CV[nI-2,1]
+    coeffsT[nI-2,1,0] = conductivity(k[nI-3,1], k[nI-2,1], dx_CV[nI-2,1], dxw_N[nI-2,1]) * dy_CV[nI-2,1]/dx_CV[nI-2,1]
     coeffsT[nI-2,1,1] = 0
+    k_e = conductivity(k[nI-2,1], k[nI-1,1], dx_CV[nI-2,1], dxe_N[nI-2,1]) 
     S_U[nI-2,1] += 2 * k_e * dy_CV[nI-2,1] * T2 / dx_CV[nI-2,1] 
     S_P[nI-2,1] += -2 * k_e * dy_CV[nI-2,1] / dx_CV[nI-2,1]####
     coeffsT[nI-2,1,2] = 0
+    k_s = conductivity(k[nI-2,0], k[nI-2,1], dy_CV[nI-2,1], dys_N[nI-2,1]) 
     S_U[nI-2,1] += 2 * k_s * dx_CV[nI-2,1] * T1 / dy_CV[nI-2,1] 
     S_P[nI-2,1] += -2 * k_s * dx_CV[nI-2,1] / dy_CV[nI-2,1] #### 
-    coeffsT[nI-2,1,3] = k_n * dx_CV[nI-2,1]/dy_CV[nI-2,1]
+    coeffsT[nI-2,1,3] = conductivity(k[nI-2,1], k[nI-2,2], dy_CV[nI-2,1], dyn_N[nI-2,1]) * dx_CV[nI-2,1]/dy_CV[nI-2,1]
     
     # N-W corner
     coeffsT[1,nJ-2,0] = 0
     S_U[1,nJ-2] += 0
-    coeffsT[1,nJ-2,1] = k_e * dy_CV[1,nJ-2]/dx_CV[1,nJ-2]
-    coeffsT[1,nJ-2,2] = k_s * dx_CV[1,nJ-2]/dy_CV[1,nJ-2]
+    coeffsT[1,nJ-2,1] = conductivity(k[1,nJ-2], k[2,nJ-2], dx_CV[1,nJ-2], dxe_N[1,nJ-2]) * dy_CV[1,nJ-2]/dx_CV[1,nJ-2]
+    coeffsT[1,nJ-2,2] = conductivity(k[1,nJ-3], k[1,nJ-2], dy_CV[1,nJ-2], dys_N[1,nJ-2]) * dx_CV[1,nJ-2]/dy_CV[1,nJ-2]
     coeffsT[1,nJ-2,3] = 0
+    k_n = conductivity(k[1,nJ-2], k[1,nJ-1], dy_CV[1,nJ-2], dyn_N[1,nJ-2])
     S_U[1,nJ-2] += 2 * k_n * dx_CV[1,nJ-2] * T[1,nJ-2+1] / dy_CV[1,nJ-2]
     S_P[1,nJ-2] += -2 * k_n * dx_CV[1,nJ-2] / dy_CV[1,nJ-2]####
     
     # N-E corner
-    coeffsT[nI-2,nJ-2,0] = k_w * dy_CV[nI-2,nJ-2]/dx_CV[nI-2,nJ-2]
+    coeffsT[nI-2,nJ-2,0] = conductivity(k[nI-3,nJ-2], k[nI-2,nJ-2], dx_CV[nI-2,nJ-2], dxw_N[nI-2,nJ-2]) * dy_CV[nI-2,nJ-2]/dx_CV[nI-2,nJ-2]
     coeffsT[nI-2,nJ-2,1] = 0
+    k_e = conductivity(k[nI-2,nJ-2], k[nI-1,nJ-2], dx_CV[nI-2,nJ-2], dxe_N[nI-2,nJ-2])
     S_U[nI-2,nJ-2] += 2 * k_e * dy_CV[nI-2,1] * T2 / dx_CV[nI-2,1]
     S_P[nI-2,nJ-2] += -2 * k_e * dy_CV[nI-2,1] / dx_CV[nI-2,1]####
-    coeffsT[nI-2,nJ-2,2] = k_s * dx_CV[nI-2,nJ-2]/dy_CV[nI-2,nJ-2]
+    coeffsT[nI-2,nJ-2,2] = conductivity(k[nI-2,nJ-3], k[nI-2,nJ-2], dy_CV[nI-2,nJ-2], dys_N[nI-2,nJ-2]) * dx_CV[nI-2,nJ-2]/dy_CV[nI-2,nJ-2]
     coeffsT[nI-2,nJ-2,3] = 0
+    k_n = conductivity(k[nI-2,nJ-2], k[nI-2,nJ-1], dy_CV[nI-2,nJ-2], dyn_N[nI-2,nJ-2])
     S_U[nI-2,nJ-2] += 2 * k_n * dx_CV[nI-2,nJ-2] * T[nI-2,nJ-2+1] / dy_CV[nI-2,nJ-2]
     S_P[nI-2,nJ-2] += -2 * k_n * dx_CV[nI-2,nJ-2] / dy_CV[nI-2,nJ-2]####
     
