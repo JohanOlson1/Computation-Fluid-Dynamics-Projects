@@ -64,8 +64,8 @@ c1 = 25; c2 = 0.25
  
 # Geometric inputs
 
-mI = 5 # number of mesh points X direction.
-mJ = 5 # number of mesh points Y direction.
+mI = 40 # number of mesh points X direction.
+mJ = 20 # number of mesh points Y direction.
 grid_type = 'non-equidistant' # this sets equidistant mesh sizing or non-equidistant
 xL = 1 # length of the domain in X direction
 yL = 1 # length of the domain in Y direction
@@ -179,9 +179,13 @@ elif grid_type == 'non-equidistant':
     
     # Fill the necessary code to generate a non equidistant grid and
     # fill the needed matrixes for the geometrical quantities
+        
+    xCoords_N[0,:] = - dx0/2 # FIX
+    yCoords_N[:,0] = - dy0/2 # FIX
+
+    yCoords_N[:,-1] = yL + dy0/2 # FIX
     
-    xCoords_N[-1,:] = xL # FIX
-    yCoords_N[:,-1] = yL # FIX
+    
 
     # Fill the coordinates
     for i in range(1, mI):
@@ -204,6 +208,18 @@ elif grid_type == 'non-equidistant':
             if j == (mJ-1) and i>0:
                 xCoords_N[i,j+1] = 0.5*(xCoords_M[i,j] + xCoords_M[i-1,j]) # last column of x, we miss without this one
                 
+    for j in range(1, mJ):
+        yCoords_M[0,j] = j*dy0
+        yCoords_N[0,j] = 0.5*(yCoords_M[0,j] + yCoords_M[0,j-1])
+        
+    for i in range(1, mI):
+        xCoords_M[i,0] = xCoords_M[i-1,0] + dx0*rx**(i-1)
+        xCoords_N[i,0] = 0.5*(xCoords_M[i,0] + xCoords_M[i-1,0])
+        
+    xCoords_N[-1,:] = xL + (xL-xCoords_N[nI-2,1])# FIX
+        
+    print(yCoords_N)
+    print(xCoords_M)
     #TODO: FIX
     # Fill dxe, dxw, dyn and dys
     for i in range(1,nI - 1):
@@ -253,7 +269,7 @@ for iter in range(nIterations):
         
         coeffsT[i,1,2] = 0 
         k_s = conductivity(k[i,0], k[i,1], dy_CV[i,1], dys_N[i,1])
-        S_U[i,1] += 2 * k_s * dx_CV[i,1] * T1 / dy_CV[i,1]                   # Work for non-equi?
+        S_U[i,1] += 2 * k_s * dx_CV[i,1] * (2*T1 - T[i,1]) / dy_CV[i,1]                   # Work for non-equi?
         S_P[i,1] += -2 * k_s * dx_CV[i,1] / dy_CV[i,1]
         
         coeffsT[i,1,3] = conductivity(k[i,1], k[i,2], dy_CV[i,1], dyn_N[i,1]) * dx_CV[i,1]/dy_CV[i,1]
@@ -265,7 +281,7 @@ for iter in range(nIterations):
         
         coeffsT[i,nJ-2,3] = 0
         k_n = conductivity(k[i,nJ-2], k[i,nJ-1], dy_CV[i,nJ-2], dyn_N[i,nJ-2])
-        S_U[i,nJ-2] += 2 * k_n * dx_CV[i,nJ-2] * T[i,nJ-1] / dy_CV[i,nJ-2]    # Work for non-equi?
+        S_U[i,nJ-2] += 2 * k_n * dx_CV[i,nJ-2] * (2*T[i,nJ-1] - T[i,nJ-2]) / dy_CV[i,nJ-2]    # Work for non-equi?
         S_P[i,nJ-2] += -2 * k_n * dx_CV[i,nJ-2] / dy_CV[i,nJ-2]
         
         
@@ -284,7 +300,7 @@ for iter in range(nIterations):
         
         coeffsT[nI-2,j,1] = 0
         k_e = conductivity(k[nI-2,j], k[nI-1,j], dx_CV[nI-2,j], dxe_N[nI-2,j])
-        S_U[nI-2,j] += 2 * k_e * dy_CV[nI-2,j] * T2 / dx_CV[nI-2,j]
+        S_U[nI-2,j] += 2 * k_e * dy_CV[nI-2,j] * (2*T2 - T[nI-2,j]) / dx_CV[nI-2,j]
         S_P[nI-2,j] += -2 * k_e * dy_CV[nI-2,j] / dx_CV[nI-2,j]
         
         coeffsT[nI-2,j,2] = conductivity(k[nI-2,j-1], k[nI-2,j], dy_CV[nI-2,j], dys_N[nI-2,j]) * dx_CV[nI-2,j]/dy_CV[nI-2,j]
@@ -310,7 +326,7 @@ for iter in range(nIterations):
     
     coeffsT[1,1,2] = 0
     k_s = conductivity(k[1,0], k[1,1], dy_CV[1,1], dys_N[1,1])
-    S_U[1,1] += 2 * k_s * dx_CV[1,1] * T1 / dy_CV[1,1]
+    S_U[1,1] += 2 * k_s * dx_CV[1,1] * (2*T1 - T[1,1]) / dy_CV[1,1]
     S_P[1,1] += -2 * k_s * dx_CV[1,1] / dy_CV[1,1]
     
     coeffsT[1,1,3] = conductivity(k[1,1], k[1,2], dy_CV[1,1], dyn_N[1,1]) * dx_CV[1,1]/dy_CV[1,1]
@@ -321,12 +337,12 @@ for iter in range(nIterations):
     
     coeffsT[nI-2,1,1] = 0
     k_e = conductivity(k[nI-2,1], k[nI-1,1], dx_CV[nI-2,1], dxe_N[nI-2,1]) 
-    S_U[nI-2,1] += 2 * k_e * dy_CV[nI-2,1] * T2 / dx_CV[nI-2,1] 
+    S_U[nI-2,1] += 2 * k_e * dy_CV[nI-2,1] * (2*T2 - T[nI-2,1]) / dx_CV[nI-2,1] 
     S_P[nI-2,1] += -2 * k_e * dy_CV[nI-2,1] / dx_CV[nI-2,1]
     
     coeffsT[nI-2,1,2] = 0
     k_s = conductivity(k[nI-2,0], k[nI-2,1], dy_CV[nI-2,1], dys_N[nI-2,1]) 
-    S_U[nI-2,1] += 2 * k_s * dx_CV[nI-2,1] * T1 / dy_CV[nI-2,1] 
+    S_U[nI-2,1] += 2 * k_s * dx_CV[nI-2,1] * (2*T1 - T[nI-2,1]) / dy_CV[nI-2,1] 
     S_P[nI-2,1] += -2 * k_s * dx_CV[nI-2,1] / dy_CV[nI-2,1]
     
     coeffsT[nI-2,1,3] = conductivity(k[nI-2,1], k[nI-2,2], dy_CV[nI-2,1], dyn_N[nI-2,1]) * dx_CV[nI-2,1]/dy_CV[nI-2,1]
@@ -342,7 +358,7 @@ for iter in range(nIterations):
     
     coeffsT[1,nJ-2,3] = 0
     k_n = conductivity(k[1,nJ-2], k[1,nJ-1], dy_CV[1,nJ-2], dyn_N[1,nJ-2])
-    S_U[1,nJ-2] += 2 * k_n * dx_CV[1,nJ-2] * T[1,nJ-2+1] / dy_CV[1,nJ-2]
+    S_U[1,nJ-2] += 2 * k_n * dx_CV[1,nJ-2] * (2*T[1,nJ-2+1] - T[1,nJ-2]) / dy_CV[1,nJ-2]
     S_P[1,nJ-2] += -2 * k_n * dx_CV[1,nJ-2] / dy_CV[1,nJ-2]
     
     
@@ -351,15 +367,15 @@ for iter in range(nIterations):
     
     coeffsT[nI-2,nJ-2,1] = 0
     k_e = conductivity(k[nI-2,nJ-2], k[nI-1,nJ-2], dx_CV[nI-2,nJ-2], dxe_N[nI-2,nJ-2])
-    S_U[nI-2,nJ-2] += 2 * k_e * dy_CV[nI-2,1] * T2 / dx_CV[nI-2,1]
+    S_U[nI-2,nJ-2] += 2 * k_e * dy_CV[nI-2,1] * (2*T2 - T[nI-2,nJ-2]) / dx_CV[nI-2,1]
     S_P[nI-2,nJ-2] += -2 * k_e * dy_CV[nI-2,1] / dx_CV[nI-2,1]
     
     coeffsT[nI-2,nJ-2,2] = conductivity(k[nI-2,nJ-3], k[nI-2,nJ-2], dy_CV[nI-2,nJ-2], dys_N[nI-2,nJ-2]) * dx_CV[nI-2,nJ-2]/dy_CV[nI-2,nJ-2]
     
     coeffsT[nI-2,nJ-2,3] = 0
     k_n = conductivity(k[nI-2,nJ-2], k[nI-2,nJ-1], dy_CV[nI-2,nJ-2], dyn_N[nI-2,nJ-2])
-    S_U[nI-2,nJ-2] += 2 * k_n * dx_CV[nI-2,nJ-2] * T[nI-2,nJ-2+1] / dy_CV[nI-2,nJ-2]
-    S_P[nI-2,nJ-2] += -2 * k_n * dx_CV[nI-2,nJ-2] / dy_CV[nI-2,nJ-2]####
+    S_U[nI-2,nJ-2] += 2 * k_n * dx_CV[nI-2,nJ-2] * (2*T[nI-2,nJ-2+1] - T[nI-2,nJ-2]) / dy_CV[nI-2,nJ-2]
+    S_P[nI-2,nJ-2] += -2 * k_n * dx_CV[nI-2,nJ-2] / dy_CV[nI-2,nJ-2]
     
     
     # a_p
@@ -442,7 +458,8 @@ plt.title('Temperature [ºC]')
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
 plt.axis('equal')
-cp = ax.contourf(xCoords_N, yCoords_N, T)
+mycmap1 = plt.get_cmap('coolwarm')
+cp = ax.contourf(xCoords_N, yCoords_N, T, cmap=mycmap1)
 plt.colorbar(cp)
 
 # Plot residual convergence
@@ -455,7 +472,7 @@ plt.title('Residual')
 
 # Plot heat fluxes
 ax2 = plt.subplot(2,2,4)
-ax2.contourf(xCoords_N, yCoords_N, T)
+ax2.contourf(xCoords_N, yCoords_N, T, cmap=mycmap1)
 ax2 = plt.quiver(xCoords_N,yCoords_N,q[:,:,0],q[:,:,1])
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
