@@ -294,7 +294,7 @@ for iter in range(nIterations):
         S_U[1,j] += 0                     # Zero when neumann cond.
         
         if boundary_4 == 'dirichlet':
-            k_w = conductivity(k[0,j], k[1,j], dy_CV[1,j], dyn_N[1,j])
+            k_w = conductivity(k[0,j], k[0,j], dy_CV[1,j], dyn_N[1,j])
             S_U[1,j] += 2 * k_w * dx_CV[1,j] * (2*T[0,j] - T[1,j]) / dy_CV[1,j]    # Work for non-equi?
             S_P[1,j] += -2 * k_w * dx_CV[1,j] / dy_CV[1,j]
         
@@ -330,7 +330,7 @@ for iter in range(nIterations):
     coeffsT[1,1,0] = 0 
     S_U[1,1] += 0  # Neumann BC
     if boundary_4 == 'dirichlet':
-        k_w = conductivity(k[0,1], k[1,1], dy_CV[1,1], dyn_N[1,1])
+        k_w = conductivity(k[0,1], k[0,1], dy_CV[1,1], dyn_N[1,1])
         S_U[1,1] += 2 * k_w * dx_CV[1,1] * (2*T[0,1] - T[1,1]) / dy_CV[1,1]    # Work for non-equi?
         S_P[1,1] += -2 * k_w * dx_CV[1,1] / dy_CV[1,1]
     
@@ -365,7 +365,7 @@ for iter in range(nIterations):
     coeffsT[1,nJ-2,0] = 0
     S_U[1,nJ-2] += 0 # Neumann
     if boundary_4 == 'dirichlet':
-        k_w = conductivity(k[0,nJ-2], k[1,nJ-2], dy_CV[1,nJ-2], dyn_N[1,nJ-2])
+        k_w = conductivity(k[0,nJ-2], k[0,nJ-2], dy_CV[1,nJ-2], dyn_N[1,nJ-2])
         S_U[1,nJ-2] += 2 * k_w * dx_CV[1,nJ-2] * (2*T[0,nJ-2] - T[1,nJ-2]) / dy_CV[1,nJ-2]    # Work for non-equi?
         S_P[1,nJ-2] += -2 * k_w * dx_CV[1,nJ-2] / dy_CV[1,nJ-2]
     
