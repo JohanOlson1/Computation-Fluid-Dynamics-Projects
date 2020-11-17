@@ -64,9 +64,10 @@ c1 = 25; c2 = 0.25
  
 # Geometric inputs
 
-mI = 40 # number of mesh points X direction.
-mJ = 20 # number of mesh points Y direction.
+mI = 20 # number of mesh points X direction.
+mJ = 40 # number of mesh points Y direction.
 grid_type = 'non-equidistant' # this sets equidistant mesh sizing or non-equidistant
+boundary_4 = 'neumann' # this sets neumann or dirichlet boundary cond.
 xL = 1 # length of the domain in X direction
 yL = 1 # length of the domain in Y direction
 
@@ -244,7 +245,8 @@ for i in range(1,nI-1):
 
 for j in range(1,nJ-1):
      T[nI-1,j] = T2                                # Boundary 2
-     
+     if boundary_4 == 'dirichlet':
+         T[0,j] = 5                                # Boundary 4 Dirichlet
 
 # Looping
 for iter in range(nIterations):
@@ -289,7 +291,13 @@ for iter in range(nIterations):
     for j in range(2,nJ-2):
         # West Boundary
         coeffsT[1,j,0] = 0
-        S_U[1,j] = 0                     # Zero when neumann cond.
+        S_U[1,j] += 0                     # Zero when neumann cond.
+        
+        if boundary_4 == 'dirichlet':
+            k_w = conductivity(k[0,j], k[1,j], dy_CV[1,j], dyn_N[1,j])
+            S_U[1,j] += 2 * k_w * dx_CV[1,j] * (2*T[0,j] - T[1,j]) / dy_CV[1,j]    # Work for non-equi?
+            S_P[1,j] += -2 * k_w * dx_CV[1,j] / dy_CV[1,j]
+        
         
         coeffsT[1,j,1] = conductivity(k[1,j], k[2,j], dx_CV[1,j], dxe_N[1,j]) * dy_CV[1,j]/dx_CV[1,j]
         coeffsT[1,j,2] = conductivity(k[1,j-1], k[1,j], dy_CV[1,j], dys_N[1,j]) * dx_CV[1,j]/dy_CV[1,j]
@@ -320,7 +328,12 @@ for iter in range(nIterations):
     
     # S-W corner
     coeffsT[1,1,0] = 0 
-    S_U[1,1] += 0
+    S_U[1,1] += 0  # Neumann BC
+    if boundary_4 == 'dirichlet':
+        k_w = conductivity(k[0,1], k[1,1], dy_CV[1,1], dyn_N[1,1])
+        S_U[1,1] += 2 * k_w * dx_CV[1,1] * (2*T[0,1] - T[1,1]) / dy_CV[1,1]    # Work for non-equi?
+        S_P[1,1] += -2 * k_w * dx_CV[1,1] / dy_CV[1,1]
+    
     
     coeffsT[1,1,1] = conductivity(k[1,1], k[2,1], dx_CV[1,1], dxe_N[1,1]) * dy_CV[1,1]/dx_CV[1,1]
     
@@ -350,7 +363,11 @@ for iter in range(nIterations):
     
     # N-W corner
     coeffsT[1,nJ-2,0] = 0
-    S_U[1,nJ-2] += 0
+    S_U[1,nJ-2] += 0 # Neumann
+    if boundary_4 == 'dirichlet':
+        k_w = conductivity(k[0,nJ-2], k[1,nJ-2], dy_CV[1,nJ-2], dyn_N[1,nJ-2])
+        S_U[1,nJ-2] += 2 * k_w * dx_CV[1,nJ-2] * (2*T[0,nJ-2] - T[1,nJ-2]) / dy_CV[1,nJ-2]    # Work for non-equi?
+        S_P[1,nJ-2] += -2 * k_w * dx_CV[1,nJ-2] / dy_CV[1,nJ-2]
     
     coeffsT[1,nJ-2,1] = conductivity(k[1,nJ-2], k[2,nJ-2], dx_CV[1,nJ-2], dxe_N[1,nJ-2]) * dy_CV[1,nJ-2]/dx_CV[1,nJ-2]
     
@@ -390,8 +407,9 @@ for iter in range(nIterations):
             T[i,j] = (rhs)/(coeffsT[i,j,4])
             
     # Copy T to boundaries where homogeneous Neumann needs to be applied
-    for j in range(nJ):
-        T[0,j] = T[1,j]
+    if boundary_4 == 'neumann':
+        for j in range(nJ):
+            T[0,j] = T[1,j]
     
     # Compute residuals (taking into account normalization)
     r = 0
@@ -464,7 +482,7 @@ plt.colorbar(cp)
 
 # Plot residual convergence
 plt.subplot(2,2,3)
-plt.plot(nIter,residuals, "red")
+plt.plot(nIter[1:-1],residuals[1:-1], "red")
 plt.title('Residual convergence')
 plt.xlabel('iterations')
 plt.ylabel('residuals [-]')
