@@ -7,6 +7,9 @@
 # villar@chalmers.se
 # November 2020
 # Packages needed
+
+
+## Group 15, Johan Olson, Alexander Rodin
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -65,7 +68,7 @@ c1 = 25; c2 = 0.25
 # Geometric inputs
 
 mI = 20 # number of mesh points X direction.
-mJ = 40 # number of mesh points Y direction.
+mJ = 20 # number of mesh points Y direction.
 grid_type = 'non-equidistant' # this sets equidistant mesh sizing or non-equidistant
 boundary_4 = 'neumann' # this sets neumann or dirichlet boundary cond.
 xL = 1 # length of the domain in X direction
@@ -172,8 +175,8 @@ if grid_type == 'equidistant':
 
 elif grid_type == 'non-equidistant':
     rx = 0.85
-    ry = 0.85
-
+    #ry = 0.95
+    
     dx0 = xL*(1-rx)/(1-rx**(mI-1))
     dy0 = yL/(mJ - 1)
 
