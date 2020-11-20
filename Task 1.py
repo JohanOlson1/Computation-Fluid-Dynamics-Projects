@@ -67,8 +67,8 @@ c1 = 25; c2 = 0.25
  
 # Geometric inputs
 
-mI = 20 # number of mesh points X direction.
-mJ = 20 # number of mesh points Y direction.
+mI = 40 # number of mesh points X direction.
+mJ = 40 # number of mesh points Y direction.
 grid_type = 'non-equidistant' # this sets equidistant mesh sizing or non-equidistant
 boundary_4 = 'neumann' # this sets neumann or dirichlet boundary cond.
 xL = 1 # length of the domain in X direction
@@ -178,7 +178,7 @@ if grid_type == 'equidistant':
                     dyn_N[i,j] = yCoords_N[i,j+1] - yCoords_N[i,j]
 
 elif grid_type == 'non-equidistant':
-    rx = 0.85
+    rx = 0.95
     #ry = 0.95
     
     dx0 = xL*(1-rx)/(1-rx**(mI-1))
