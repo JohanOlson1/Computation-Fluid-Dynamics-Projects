@@ -13,6 +13,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+def interpolate_u(U_upper, U_down, d_CV, d_N):
+    f = 0.5 * d_N / d_CV
+    k = f * U_upper + (1-f)*U_down     
+    return k
+
 # Group 15 Johan Olson, Alexander Rodin
 def  ReadDataAndGeometry(caseID, grid_type):
 	if caseID <= 5:
@@ -87,7 +92,7 @@ solver_type = 'TDMA'   # Either 'TDMA' or 'Gauss-Seidel'
 caseID      =  15      # your case number to solve
 k           =  1       # Conductivity
 rho         =  1       # density
-nIterations =  1000    # number of iterations
+nIterations =  1500    # number of iterations
 Cp          =  200     # Heat capacity
 plotVelocityVectors = False
 resTolerance = 0.001   # Error Tolerarance 
@@ -129,9 +134,9 @@ nIter = []
 # Code
 gamma = k/Cp                  # 
 q_s = 100                     # Heat flow South Boundary   
-Speed_factor = 1
-T_New = 273.15 + 100
-
+Speed_factor = 1              # Factor to reduce the flow speed
+T_New = 273.15 + 100          # Temperature for new Boundary Condition
+ 
 ## Diffusive and convective coefficient calculations
 # Remark: No need to keep inside iteration lopp since independent of temp!
 for i in range(1,cI-1):
@@ -180,32 +185,38 @@ for i in range(1, cI-1):
     S_U[i,1] = q_s * dx_C[i]
     S_U[i,-2] = max([-F[i,-2,2], (D[i,-2,2]-F[i,-2,2])/2, 0]) * T_D
     
+    #coeffsT[i,1,4] = coeffsT[i,1,0] + coeffsT[i,1,1] + coeffsT[i,1,2] + \
+    #   coeffsT[i,1,3] + F[i,1,0] - F[i,1,1] + F[i,1,2]
+    
 for iter in range(nIterations): 
     # Impose boundary conditions? No need?
     
     # TDMA Solution
     if solver_type == 'TDMA':
         # Calculate all P, Q in for loop
-        for j in range(1, cJ-1):
-            for i in range(1, cI-1):
-                d_x[i] = coeffsT[i,j,2] * T[i,j+1] + coeffsT[i,j,3] * T[i,j-1] + S_U[i,j]
-                P_x[i] = coeffsT[i,j,0]/(coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])
-                Q_x[i] = (d_x[i] + coeffsT[i,j,1] * Q_x[i-1])/(coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])
-                
-            # Backward differencing: East-West
-            for k in range(cI-2, 0, -1):
-                T[k,j] = P_x[k] * T[k+1,j] + Q_x[k]
-                
-        for i in range(1, cI-1):
+        
+        if (iter % 2) == 0:
             for j in range(1, cJ-1):
-                d_y[j] = coeffsT[i,j,0] * T[i+1,j] + coeffsT[i,j,1] * T[i-1,j] + S_U[i,j]
-                P_y[j] = coeffsT[i,j,2]/(coeffsT[i,j,4] - coeffsT[i,j,3]*P_y[j-1])
-                Q_y[j] = (d_y[j] + coeffsT[i,j,3] * Q_y[j-1])/(coeffsT[i,j,4] - coeffsT[i,j,3]*P_y[j-1])
+                for i in range(1, cI-1):
+                    d_x[i] = coeffsT[i,j,2] * T[i,j+1] + coeffsT[i,j,3] * T[i,j-1] + S_U[i,j]
+                    P_x[i] = coeffsT[i,j,0]/(coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])
+                    Q_x[i] = (d_x[i] + coeffsT[i,j,1] * Q_x[i-1])/(coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])
+                    
+                # Backward differencing: East-West
+                for k in range(cI-2, 0, -1):
+                    T[k,j] = P_x[k] * T[k+1,j] + Q_x[k]
+                    
+        else:      
+            for i in range(1, cI-1):
+                for j in range(1, cJ-1):
+                    d_y[j] = coeffsT[i,j,0] * T[i+1,j] + coeffsT[i,j,1] * T[i-1,j] + S_U[i,j]
+                    P_y[j] = coeffsT[i,j,2]/(coeffsT[i,j,4] - coeffsT[i,j,3]*P_y[j-1])
+                    Q_y[j] = (d_y[j] + coeffsT[i,j,3] * Q_y[j-1])/(coeffsT[i,j,4] - coeffsT[i,j,3]*P_y[j-1])
+                    
+                # Backward differencing: North-South
+                for k in range(cJ-2, 0, -1):
+                    T[i,k] = P_y[k] * T[i,k+1] + Q_y[k]
                 
-            # Backward differencing: North-South
-            for k in range(cJ-2, 0, -1):
-                T[i,k] = P_y[k] * T[i,k+1] + Q_y[k]
-            
     # Gauss-Seidel Solution
     if solver_type == 'Gauss-Seidel':
         for j in range(1,cJ-1):
@@ -254,34 +265,38 @@ for iter in range(nIterations):
     if resTolerance>residuals[-1]:
         break
 
-# Total Conservation
-Flux = 0
+# Total Conservation???
+Flux_tot = 0
 for i in range(1,cI-1):
-    Flux += - k * (T[i,0] - T[i,1])/dx_C[i]
-    Flux += - k * (T[i,-1] - T[i,-2])/dx_C[i]
+    Flux_tot += - k * (T[i,0] - T[i,1])/dx_C[i]
+    Flux_tot += np.abs([F[i,-2, 2]])
+    Flux_tot += q_s 
 for j in range(1,cJ-1):
-    Flux += - k * (T[0,j] - T[1,j])/dy_C[j]
-    Flux += - k * (T[-1,j] - T[-2,j])/dy_C[j]
+    Flux_tot += - np.abs([F[1,j,1]])
+    Flux_tot += - np.abs([F[-2,j,0]])
     
-print(Flux)
+print(Flux_tot)
 
 # Plotting (these are some examples, more plots might be needed)
 xv, yv = np.meshgrid(xCoords_N, yCoords_N)
 
-plt.figure()
-plt.quiver(xv, yv, U.T, V.T)
-plt.title('Velocity vectors')
-plt.xlabel('x [m]')
-plt.ylabel('y [m]')
-plt.show()
-
-plt.figure()
-plt.contourf(xv, yv, T.T)
-plt.colorbar()
-plt.title('Temperature')
-plt.xlabel('x [m]')
-plt.ylabel('y [m]')
-plt.show()
+# =============================================================================
+# plt.figure()
+# plt.quiver(xv, yv, U.T, V.T)
+# plt.title('Velocity vectors')
+# plt.xlabel('x [m]')
+# plt.ylabel('y [m]')
+# plt.show()
+# 
+# plt.figure()
+# mycmap1 = plt.get_cmap('coolwarm')
+# plt.contourf(xv, yv, T.T, cmap=mycmap1)
+# plt.colorbar()
+# plt.title('Temperature')
+# plt.xlabel('x [m]')
+# plt.ylabel('y [m]')
+# plt.show()
+# =============================================================================
 
 plt.figure()
 plt.plot(nIter[1:-1],residuals[1:-1], "red")
@@ -292,7 +307,7 @@ plt.title('Residual')
 
 plt.subplot(1,2,1)
 plt.plot(yv[:,0], T[0,:])
-plt.title('Temperature')
+plt.title('Temperature Boundary 4')
 plt.xlabel('y [m]')
 plt.ylabel('T [K]')
 plt.show()
@@ -300,16 +315,17 @@ plt.show()
 
 plt.subplot(1,2,2)
 plt.plot(xv[0,:], T[:,0])
-plt.title('Temperature')
+plt.title('Temperature Boundary 1')
 plt.xlabel('x [m]')
 plt.ylabel('T [K]')
 plt.show()
 
-## TASK 2 TODO
-# 1. A convection term added => new equation 
-# 2. New type of discretization: Hybrid scheme, Pe > 2 -> Upwind 
-# 3. Use of either Gauss-Seidel or TDMA
-# 4. Temperature in Kelvin!
-# 5. Implement different termination criteria
-#
-#
+plt.figure()
+mycmap1 = plt.get_cmap('coolwarm')
+plt.contourf(xv, yv, T.T, cmap=mycmap1)
+plt.colorbar()
+plt.quiver(xv, yv, U.T, V.T)
+plt.title('Temperatures and Velocity Fields')
+plt.xlabel('x [m]')
+plt.ylabel('y [m]')
+plt.show()
