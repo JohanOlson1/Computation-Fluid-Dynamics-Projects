@@ -89,10 +89,11 @@ def  ReadDataAndGeometry(caseID, grid_type):
 # Inputs
 grid_type   = 'fine'   # either 'coarse' or 'fine'
 solver_type = 'TDMA'   # Either 'TDMA' or 'Gauss-Seidel'
+Cond_west   = 'Neumann'# Either 'Neumann' or 'Dirichlet'
 caseID      =  15      # your case number to solve
 k           =  1       # Conductivity
 rho         =  1       # density
-nIterations =  1500    # number of iterations
+nIterations =  4000    # Max number of iterations
 Cp          =  200     # Heat capacity
 plotVelocityVectors = False
 resTolerance = 0.001   # Error Tolerarance 
@@ -135,7 +136,7 @@ nIter = []
 gamma = k/Cp                  # 
 q_s = 100                     # Heat flow South Boundary   
 Speed_factor = 1              # Factor to reduce the flow speed
-T_New = 273.15 + 30           # Temperature for new Boundary Condition
+T_New = 273.15 + 20           # Temperature for new Boundary Condition
  
 ## Diffusive and convective coefficient calculations
 # Remark: No need to keep inside iteration lopp since independent of temp!
@@ -146,30 +147,34 @@ for i in range(1,cI-1):
 	    D[i,j,2] = gamma * dx_C[i] / dyn_C[j] # north diffusive
 	    D[i,j,3] = gamma * dx_C[i] / dys_C[j] # south diffusive
 	    
-        # Remark, unsure of indices, U,V in node or mesh?
-	    F[i,j,0] = rho * dy_C[j] * Interpolate_u(U[i,j], U[i+1,j], dx_C[i], dxe_C[i])/Speed_factor    # east convective
-	    F[i,j,1] = rho * dy_C[j] * Interpolate_u(U[i,j], U[i-1,j], dx_C[i], dxw_C[i])/Speed_factor    # west convective
-	    F[i,j,2] = rho * dx_C[i] * Interpolate_u(V[i,j], V[i,j+1], dy_C[j], dyn_C[j])/Speed_factor    # north convective
-	    F[i,j,3] = rho * dx_C[i] * Interpolate_u(V[i,j], V[i,j-1], dy_C[j], dys_C[j])/Speed_factor    # south convective
+for i in range(2,cI-2):
+	for j in range(2,cJ-2):
+	    F[i,j,0] = rho * dy_C[j] * Interpolate_u(U[i,j], U[i+1,j], \
+      dx_C[i], dxe_C[i])/Speed_factor    # east convective
+	    F[i,j,1] = rho * dy_C[j] * Interpolate_u(U[i,j], U[i-1,j], \
+      dx_C[i], dxw_C[i])/Speed_factor    # west convective
+	    F[i,j,2] = rho * dx_C[i] * Interpolate_u(V[i,j], V[i,j+1], \
+      dy_C[j], dyn_C[j])/Speed_factor    # north convective
+	    F[i,j,3] = rho * dx_C[i] * Interpolate_u(V[i,j], V[i,j-1], \
+      dy_C[j], dys_C[j])/Speed_factor    # south convective
 
+# No need to interpolate velocity at boundaries!
 for i in range(1,cI-1):
-	F[i,-2,2] = rho * dx_C[i] * V[i,-1]/Speed_factor    # north convective
+	F[i,-2,2] = rho * dx_C[i] * V[i,-1]/Speed_factor  # north convective
 	F[i,1,3] = rho * dx_C[i] * V[i,0]/Speed_factor    # south convective
-    
 for j in range(1,cJ-1):
-    F[-2,j,0] = rho * dy_C[j] * U[-1,j]/Speed_factor    # east convective
+    F[-2,j,0] = rho * dy_C[j] * U[-1,j]/Speed_factor  # east convective
     F[1,j,1] = rho * dy_C[j] * U[0,j]/Speed_factor    # west convective
         
-# Hybrid scheme coefficients calculations (taking into account boundary conditions)
+# Hybrid scheme coefficients calculations (taking into account boundary conditions afterwards!)
 for i in range(1,cI-1):
 	for j in range(1,cJ-1):
-		coeffsT[i,j,0] = max([-F[i,j,0], (D[i,j,0]-F[i,j,0])/2, 0])
-		coeffsT[i,j,1] = max([F[i,j,1], (D[i,j,1]+F[i,j,1])/2, 0])
-		coeffsT[i,j,2] = max([-F[i,j,2], (D[i,j,2]-F[i,j,2])/2, 0])
-		coeffsT[i,j,3] = max([F[i,j,3], (D[i,j,3]+F[i,j,3])/2, 0])
+		coeffsT[i,j,0] = max([-F[i,j,0], D[i,j,0]-F[i,j,0]/2, 0])
+		coeffsT[i,j,1] = max([F[i,j,1], D[i,j,1]+F[i,j,1]/2, 0])
+		coeffsT[i,j,2] = max([-F[i,j,2], D[i,j,2]-F[i,j,2]/2, 0])
+		coeffsT[i,j,3] = max([F[i,j,3], D[i,j,3]+F[i,j,3]/2, 0])
 		coeffsT[i,j,4] = coeffsT[i,j,0] + coeffsT[i,j,1] + coeffsT[i,j,2] + \
         coeffsT[i,j,3] 
-        # S_P is the coefficient that should otherwise be zero, and therefore already done!
 
 ## East and West boundary
 #Remark: Neumann Cond. -> coefficient is zero
@@ -177,55 +182,66 @@ for j in range(1, cJ-1):
     coeffsT[-2,j,0] = 0
     coeffsT[1,j,1] = 0
         
-    # Recalculate a_p
+    # Recalculate a_p,
     coeffsT[-2,j,4] = coeffsT[-2,j,0] + coeffsT[-2,j,1] + coeffsT[-2,j,2] + \
     coeffsT[-2,j,3] 
-        
-    # Recalculate a_p
-    S_U[1,j] = max([-F[1,j,1], (D[1,j,1]-F[1,j,1])/2, 0]) * T_New # If dirichlet
-    #coeffsT[1,j,4] = coeffsT[1,j,0] + coeffsT[1,j,1] + coeffsT[1,j,2] + \
-    #coeffsT[1,j,3] 
+    
+    if Cond_west == 'Dirichlet':
+        S_U[1,j] = max([F[1,j,1], D[1,j,1]+F[1,j,1]/2, 0]) * T_New 
+        # Recalculate a_p
+        coeffsT[1,j,4] = coeffsT[1,j,0] + coeffsT[1,j,1] + coeffsT[1,j,2] + \
+    coeffsT[1,j,3] + max([F[1,j,1], D[1,j,1]+F[1,j,1]/2, 0])
+    else:
+        # Recalculate a_p
+        coeffsT[1,j,4] = coeffsT[1,j,0] + coeffsT[1,j,1] + coeffsT[1,j,2] + \
+        coeffsT[1,j,3]
 
 # North and (South Boundary constant heat flow)
 for i in range(1, cI-1):
     coeffsT[i,1,3] = 0
     coeffsT[i,-2,2] = 0
+    
     S_U[i,1] = q_s * dx_C[i] /Cp
-    S_U[i,-2] = max([-F[i,-2,2], (D[i,-2,2]-F[i,-2,2])/2, 0]) * T_D
+    S_U[i,-2] = max([-F[i,-2,2], D[i,-2,2]-F[i,-2,2]/2, 0]) * T_D
     
     # Recalculate a_p
     coeffsT[i,1,4] = coeffsT[i,1,0] + coeffsT[i,1,1] + coeffsT[i,1,2] + \
        coeffsT[i,1,3]
     
-    # Recalculate a_p
+    # Recalculate a_p, actually not needed, but here for illustration! - S_P == a_N
     coeffsT[i,-2,4] = coeffsT[i,-2,0] + coeffsT[i,-2,1] + coeffsT[i,-2,2] + \
-       coeffsT[i,-2,3] + max([-F[i,-2,2], (D[i,-2,2]-F[i,-2,2])/2, 0])
+       coeffsT[i,-2,3] + max([-F[i,-2,2], D[i,-2,2]-F[i,-2,2]/2, 0])
+    
+# Temperature along west boundary
+if Cond_west == 'Dirichlet':
+    for j in range(cJ):
+        T[0,j]  = T_New 
+
+# Temperature along north boundary
+for i in range(cI):
+    T[i,-1] = T_D
     
 for iter in range(nIterations): 
-    # Impose boundary conditions? No need?
     
     # TDMA Solution
     if solver_type == 'TDMA':
         # Calculate all P, Q in for loop
-        
         if (iter % 2) == 0:
             for j in range(1, cJ-1):
                 for i in range(1, cI-1):
                     d_x[i] = coeffsT[i,j,2] * T[i,j+1] + coeffsT[i,j,3] * T[i,j-1] + S_U[i,j]
                     P_x[i] = coeffsT[i,j,0]/(coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])
-                    Q_x[i] = (d_x[i] + coeffsT[i,j,1] * Q_x[i-1])/(coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])
-                    
+                    Q_x[i] = (d_x[i] + coeffsT[i,j,1] * Q_x[i-1])/(coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])            
                 # Backward differencing: East-West
                 for k in range(cI-2, 0, -1):
                     T[k,j] = P_x[k] * T[k+1,j] + Q_x[k]
-                    
+            
         else:      
             for i in range(1, cI-1):
                 for j in range(1, cJ-1):
                     d_y[j] = coeffsT[i,j,0] * T[i+1,j] + coeffsT[i,j,1] * T[i-1,j] + S_U[i,j]
                     P_y[j] = coeffsT[i,j,2]/(coeffsT[i,j,4] - coeffsT[i,j,3]*P_y[j-1])
-                    Q_y[j] = (d_y[j] + coeffsT[i,j,3] * Q_y[j-1])/(coeffsT[i,j,4] - coeffsT[i,j,3]*P_y[j-1])
-                    
+                    Q_y[j] = (d_y[j] + coeffsT[i,j,3] * Q_y[j-1])/(coeffsT[i,j,4] - coeffsT[i,j,3]*P_y[j-1])  
                 # Backward differencing: North-South
                 for k in range(cJ-2, 0, -1):
                     T[i,k] = P_y[k] * T[i,k+1] + Q_y[k]
@@ -240,12 +256,10 @@ for iter in range(nIterations):
 
     # Copy temperatures to boundaries
     for i in range(cI):
-        T[i,-1] = T_D
         T[i,0] = T[i,1]
-    
-    for j in range(1, cJ-1):
-        #T[0,j]  = T[1,j] # If Neumann here
-        T[0,j]  = T_New # If Dirichlet here
+    for j in range(cJ):
+        if Cond_west == 'Neumann':
+            T[0,j]  = T[1,j] 
         T[-1,j] = T[-2,j]
     
     # Compute residuals (taking into account normalization)
@@ -256,64 +270,45 @@ for iter in range(nIterations):
             coeffsT[i,j,2]*T[i,j+1] + coeffsT[i,j,3]*T[i,j-1]
             r += np.abs(coeffsT[i,j,4]*T[i,j] - rhs)
             
-    
-    Inlet = 0
-    Outlet = 0
+    Inlet = 0; Outlet = 0
     for i in range(1,cI-1):
         # North Boundary
         Inlet += np.abs(rho * V[i,-1] * dx_C[i] * T[i,-1])
     for j in range(1,cJ-1):
+        # East and West Boundary
         Outlet += np.abs(rho * U[0,j] * dy_C[j] * T[0,j]) + np.abs(rho * U[-1,j] * dy_C[j] * T[-1,j])
     
     r /= np.abs(Inlet - Outlet) # r/F
             
     residuals.append(r) # fill with your residual value for the 
-    nIter.append(iter)
-                       # current iteration
+    nIter.append(iter)  # Append respective iter
     
     print('iteration: %d\nresT = %.5e\n\n' % (iter, residuals[-1]))
     
     # Check convergence
-    
     if resTolerance>residuals[-1]:
         break
-
-# Total Conservation???
+    
+# Total Conservation
 Flux_tot = 0
+Diffusion_north = 0
+Heat_flow_south = 0
 for i in range(1,cI-1):
-    Diffusion = k * (T[i,-1] - T[i,-2])/dx_C[i]
-    Heat_flow_south = q_s * dx_C[i] / Cp
+    Diffusion_north += - k * dx_C[i] * (T[i,-1] - T[i,-2])/dy_C[-2]
+    Heat_flow_south += q_s * dx_C[i] / Cp
 
-Flux_tot += Diffusion
+Flux_tot += Diffusion_north
 Flux_tot += Heat_flow_south
 Flux_tot += Inlet - Outlet
 print("Netto flux in",Flux_tot)
 print("South heat flow in", Heat_flow_south)
-print("Diffusion in", Diffusion)
+print("Diffusion in", Diffusion_north)
 print("Flow in", Inlet)
 print("Flow out", Outlet)
-print(np.abs(Flux_tot/(Inlet + q_s + Diffusion)))
+print(np.abs(Flux_tot/(Inlet + q_s + Diffusion_north)))
 
-# Plotting (these are some examples, more plots might be needed)
+# Plotting 
 xv, yv = np.meshgrid(xCoords_N, yCoords_N)
-
-# =============================================================================
-# plt.figure()
-# plt.quiver(xv, yv, U.T, V.T)
-# plt.title('Velocity vectors')
-# plt.xlabel('x [m]')
-# plt.ylabel('y [m]')
-# plt.show()
-# 
-# plt.figure()
-# mycmap1 = plt.get_cmap('coolwarm')
-# plt.contourf(xv, yv, T.T, cmap=mycmap1)
-# plt.colorbar()
-# plt.title('Temperature')
-# plt.xlabel('x [m]')
-# plt.ylabel('y [m]')
-# plt.show()
-# =============================================================================
 
 plt.figure()
 plt.plot(nIter[1:-1],residuals[1:-1], "red")
@@ -323,17 +318,16 @@ plt.ylabel('residuals [-]')
 plt.title('Residual')
 
 plt.figure()
-plt.subplot(1,2,1)
-plt.plot(yv[:,0], T[0,:])
-plt.title('Temperature Boundary 4')
+plt.plot(yv[1:-1,0], T[0,1:-1])
+plt.title('Temperature Boundary West Boundary')
 plt.xlabel('y [m]')
 plt.ylabel('T [K]')
 plt.show()
 
 
-plt.subplot(1,2,2)
-plt.plot(xv[0,:], T[:,0])
-plt.title('Temperature Boundary 1')
+plt.figure()
+plt.plot(xv[0,1:-1], T[1:-1,0])
+plt.title('Temperature South Boundary')
 plt.xlabel('x [m]')
 plt.ylabel('T [K]')
 plt.show()
