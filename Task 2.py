@@ -131,6 +131,7 @@ T_D = 273.15 + 10             # Temperature at Inlet
 
 residuals = []
 nIter = []
+Flist = []
 
 # Code
 gamma = k/Cp                  # 
@@ -229,9 +230,11 @@ for iter in range(nIterations):
         if (iter % 2) == 0:
             for j in range(1, cJ-1):
                 for i in range(1, cI-1):
-                    d_x[i] = coeffsT[i,j,2] * T[i,j+1] + coeffsT[i,j,3] * T[i,j-1] + S_U[i,j]
+                    d_x[i] = coeffsT[i,j,2] * T[i,j+1] + coeffsT[i,j,3] \
+                    * T[i,j-1] + S_U[i,j]
                     P_x[i] = coeffsT[i,j,0]/(coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])
-                    Q_x[i] = (d_x[i] + coeffsT[i,j,1] * Q_x[i-1])/(coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])            
+                    Q_x[i] = (d_x[i] + coeffsT[i,j,1] * Q_x[i-1])/\
+                    (coeffsT[i,j,4] - coeffsT[i,j,1]*P_x[i-1])            
                 # Backward differencing: East-West
                 for k in range(cI-2, 0, -1):
                     T[k,j] = P_x[k] * T[k+1,j] + Q_x[k]
@@ -239,9 +242,11 @@ for iter in range(nIterations):
         else:      
             for i in range(1, cI-1):
                 for j in range(1, cJ-1):
-                    d_y[j] = coeffsT[i,j,0] * T[i+1,j] + coeffsT[i,j,1] * T[i-1,j] + S_U[i,j]
+                    d_y[j] = coeffsT[i,j,0] * T[i+1,j] + coeffsT[i,j,1] * \
+                    T[i-1,j] + S_U[i,j]
                     P_y[j] = coeffsT[i,j,2]/(coeffsT[i,j,4] - coeffsT[i,j,3]*P_y[j-1])
-                    Q_y[j] = (d_y[j] + coeffsT[i,j,3] * Q_y[j-1])/(coeffsT[i,j,4] - coeffsT[i,j,3]*P_y[j-1])  
+                    Q_y[j] = (d_y[j] + coeffsT[i,j,3] * Q_y[j-1])/(coeffsT[i,j,4] \
+                       - coeffsT[i,j,3]*P_y[j-1])  
                 # Backward differencing: North-South
                 for k in range(cJ-2, 0, -1):
                     T[i,k] = P_y[k] * T[i,k+1] + Q_y[k]
@@ -276,10 +281,12 @@ for iter in range(nIterations):
         Inlet += np.abs(rho * V[i,-1] * dx_C[i] * T[i,-1])
     for j in range(1,cJ-1):
         # East and West Boundary
-        Outlet += np.abs(rho * U[0,j] * dy_C[j] * T[0,j]) + np.abs(rho * U[-1,j] * dy_C[j] * T[-1,j])
-    
+        Outlet += np.abs(rho * U[0,j] * dy_C[j] * T[0,j]) + np.abs(rho * \
+                        U[-1,j] * dy_C[j] * T[-1,j]) 
+     
     r /= np.abs(Inlet - Outlet) # r/F
             
+    Flist.append(np.abs(Inlet - Outlet))
     residuals.append(r) # fill with your residual value for the 
     nIter.append(iter)  # Append respective iter
     
@@ -290,12 +297,14 @@ for iter in range(nIterations):
         break
     
 # Total Conservation
+Inlet = Inlet*Cp
+Outlet = Outlet*Cp
 Flux_tot = 0
 Diffusion_north = 0
 Heat_flow_south = 0
 for i in range(1,cI-1):
-    Diffusion_north += - k * dx_C[i] * (T[i,-1] - T[i,-2])/dy_C[-2]
-    Heat_flow_south += q_s * dx_C[i] / Cp
+    Diffusion_north += - k * dx_C[i] * (T[i,-1] - T[i,-2])/dyn_C[-2]
+    Heat_flow_south += q_s * dx_C[i] 
 
 Flux_tot += Diffusion_north
 Flux_tot += Heat_flow_south
@@ -304,31 +313,25 @@ print("Netto flux in",Flux_tot)
 print("South heat flow in", Heat_flow_south)
 print("Diffusion in", Diffusion_north)
 print("Flow in", Inlet)
-print("Flow out", Outlet)
-print(np.abs(Flux_tot/(Inlet + q_s + Diffusion_north)))
+print("Flow out", - Outlet)
+print("Global Conservation",np.abs(Flux_tot/(Inlet + q_s + Diffusion_north)))
 
 # Plotting 
 xv, yv = np.meshgrid(xCoords_N, yCoords_N)
 
 plt.figure()
-plt.plot(nIter[1:-1],residuals[1:-1], "red")
+plt.semilogy(nIter[1:-1],residuals[1:-1], "red", label="Residuals")
+plt.semilogy(nIter[1:-1],Flist[1:-1], "blue", label="F")
+plt.legend(loc="upper right")
 plt.title('Residual convergence')
 plt.xlabel('iterations')
-plt.ylabel('residuals [-]')
-plt.title('Residual')
+plt.ylabel('Log(residuals)')
+plt.title('Residuals and F')
 
 plt.figure()
 plt.plot(yv[1:-1,0], T[0,1:-1])
 plt.title('Temperature Boundary West Boundary')
 plt.xlabel('y [m]')
-plt.ylabel('T [K]')
-plt.show()
-
-
-plt.figure()
-plt.plot(xv[0,1:-1], T[1:-1,0])
-plt.title('Temperature South Boundary')
-plt.xlabel('x [m]')
 plt.ylabel('T [K]')
 plt.show()
 
