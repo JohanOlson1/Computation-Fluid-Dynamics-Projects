@@ -7,6 +7,10 @@
 # villar@chalmers.se
 # December 2020
 
+def Rhie_Chow(Up, Ub, dA, a_p, ap_b, P_term):
+    U_interpolated = 0.5*(Up + Ub) + (dA/(4*(a_p + ap_b)/2))*P_term
+    return U_interpolated
+
 #==============Packages needed=================
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +24,7 @@ UWall = 1 # velocity of the upper wall
 rho   = 1 # density
 nu    = 0.001 # kinematic viscosity
 
-data_file = 'data_hybrid' # data file where the given solution is stored
+data_file = 'data_hybrid.txt' # data file where the given solution is stored
 
 # Geometric inputs (fixed so that a fair comparison can be made)
 
@@ -31,8 +35,8 @@ yL =  1 # length in Y direction
 
 # Solver inputs
 
-nIterations           =  10 # maximum number of iterations
-n_inner_iterations_gs =  10 # amount of inner iterations when solving 
+nIterations           =  25 # maximum number of iterations
+n_inner_iterations_gs =  15 # amount of inner iterations when solving 
                               # pressure correction with Gauss-Seidel
 resTolerance =  0.0001 # convergence criteria for residuals
                      # each variable
@@ -85,6 +89,7 @@ dy_CV      = np.zeros((nI,nJ)) # Y size of the node
 residuals_U = []
 residuals_V = []
 residuals_c = []
+nIter = []
 
 dx = xL/(mI - 1)
 dy = yL/(mJ - 1)
@@ -136,14 +141,16 @@ Dy = nu*rho/dy
 F_x = rho*dy
 F_y = rho*dx
 
+U[:,-1] = 1
+
 # ================ Looping =======================
 ### Iteration start
 
 for iter in range(nIterations):
     ### Boundary Conditions
     ## Impose boundary conditions for velocities, only the top boundary wall
-        # TO-DO: Make it implicit instead of explicit
-    U[:,-1] = 1
+        # TO-DO: Make it implicit instead of explicit?
+    #U[:,-1] = 1
     
     # Impose pressure boundary condition, all homogeneous Neumann
     # How about no
@@ -158,9 +165,9 @@ for iter in range(nIterations):
         coeffsUV[i,j,1] = Dx + max([F_x*(U[i,j]+U[i-1,j])/2,0])
         coeffsUV[i,j,2] = 0
         coeffsUV[i,j,3] = Dy + max([F_y*(V[i,j]+V[i,j-1])/2,0])
-        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3] + (2*Dy + max([F_y*(U[i,j+1]),0]))
-        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2 + (2*Dy + max([F_y*(U[i,j+1]),0]))
-        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
+        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3] + (2*Dy + max([F_y*(V[i,j+1]),0]))
+        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy + (2*Dy + max([F_y*(V[i,j+1]),0]))*U[i,j+1]
+        sourceUV[i,j,1] = ((P[i,j-1]+P[i,j])/2-P[i,j+1])*dx
         
         # South
         j = 1
@@ -170,7 +177,7 @@ for iter in range(nIterations):
         coeffsUV[i,j,3] = 0
         coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3]  
         sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
+        sourceUV[i,j,1] = (P[i,j-1] - (P[i,j] + P[i,j+1])/2)*dx
 
     # Second, east and west boundaries
     for j in range(2,nJ-2):
@@ -181,7 +188,7 @@ for iter in range(nIterations):
         coeffsUV[i,j,2] = Dy + max([0,- F_y*(V[i,j]+V[i,j+1])/2])
         coeffsUV[i,j,3] = Dy + max([F_y*(V[i,j]+V[i,j-1])/2,0])
         coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3]  
-        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
+        sourceUV[i,j,0] = ((P[i-1,j]+P[i,j])/2-P[i+1,j])*dy
         sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
         
         # West
@@ -191,7 +198,7 @@ for iter in range(nIterations):
         coeffsUV[i,j,2] = Dy + max([0,- F_y*(V[i,j]+V[i,j+1])/2])
         coeffsUV[i,j,3] = Dy + max([F_y*(V[i,j]+V[i,j-1])/2,0])
         coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3] 
-        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
+        sourceUV[i,j,0] = (P[i-1,j]-(P[i+1,j]+P[i,j]/2))*dy
         sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
          
     ## Compute coefficients at corner nodes (one step inside)
@@ -202,9 +209,9 @@ for iter in range(nIterations):
     coeffsUV[i,j,1] = 0
     coeffsUV[i,j,2] = 0
     coeffsUV[i,j,3] = Dy + max([F_y*(V[i,j]+V[i,j-1])/2,0])
-    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3] 
-    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
+    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3] + (2*Dy + max([F_y*(V[i,j+1]),0]))
+    sourceUV[i,j,0] = (P[i-1,j]-(P[i+1,j]+P[i,j]/2))*dy + (2*Dy + max([F_y*(V[i,j+1]),0]))*U[i,j+1]
+    sourceUV[i,j,1] = ((P[i,j-1]+P[i,j])/2-P[i,j+1])*dx 
     
     # North-East Corner
     i = -2; j = -2;
@@ -212,9 +219,9 @@ for iter in range(nIterations):
     coeffsUV[i,j,1] = Dx + max([F_x*(U[i,j]+U[i-1,j])/2,0])
     coeffsUV[i,j,2] = 0
     coeffsUV[i,j,3] = Dy + max([F_y*(V[i,j]+V[i,j-1])/2,0])
-    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3] 
-    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
+    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3] + (2*Dy + max([F_y*(V[i,j+1]),0])) 
+    sourceUV[i,j,0] = ((P[i-1,j]+P[i,j])/2-P[i+1,j])*dy + (2*Dy + max([F_y*(V[i,j+1]),0]))*U[i,j+1]
+    sourceUV[i,j,1] = ((P[i,j-1]+P[i,j])/2-P[i,j+1])*dx
     
     # South-West Corner
     i = 1; j = 1; 
@@ -223,8 +230,8 @@ for iter in range(nIterations):
     coeffsUV[i,j,2] = Dy + max([0,- F_y*(V[i,j]+V[i,j+1])/2])
     coeffsUV[i,j,3] = 0
     coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3] 
-    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
+    sourceUV[i,j,0] = (P[i-1,j]-(P[i+1,j]+P[i,j]/2))*dy
+    sourceUV[i,j,1] = (P[i,j-1] - (P[i,j] + P[i,j+1])/2)*dx
     
     # South-East Corner
     i = -2; j = 1;
@@ -233,8 +240,8 @@ for iter in range(nIterations):
     coeffsUV[i,j,2] = Dy + max([0,- F_y*(V[i,j]+V[i,j+1])/2])
     coeffsUV[i,j,3] = 0
     coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] + coeffsUV[i,j,3] 
-    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
+    sourceUV[i,j,0] = ((P[i-1,j]+P[i,j])/2-P[i+1,j])*dy
+    sourceUV[i,j,1] = (P[i,j-1] - (P[i,j] + P[i,j+1])/2)*dx
     
     
     ## Compute coefficients for inner nodes
@@ -261,103 +268,102 @@ for iter in range(nIterations):
                 + (1-alphaUV)*V[i,j]
                   
     ## Calculate at the faces using Rhie-Chow for the face velocities
-    
     # First, North and South
     for i in range(2,nI-2):
         # North
         j = -2;
-        massFlows[i,j,0] = 0.5*(U[i,j] + U[i+1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i+1,j,4])/2))*\
-                (P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
-        massFlows[i,j,1] = 0.5*(U[i,j] + U[i-1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i-1,j,4])/2))*\
-                (P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
+        massFlows[i,j,0] = Rhie_Chow(U[i,j], U[i+1,j], dy, coeffsUV[i,j,4], \
+            coeffsUV[i+1,j,4], P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
+        massFlows[i,j,1] = Rhie_Chow(U[i,j], U[i-1,j], dy, coeffsUV[i,j,4], \
+            coeffsUV[i-1,j,4], P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
         massFlows[i,j,2] = V[i,j+1]
-        massFlows[i,j,3] = 0.5*(V[i,j] + V[i,j-1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j-1,4])/2))*\
-                (P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2])
+        massFlows[i,j,3] = Rhie_Chow(V[i,j], V[i,j-1], dx, coeffsUV[i,j,4], \
+            coeffsUV[i,j-1,4], P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2]) 
                 
         # South
         j = 1;
-        massFlows[i,j,0] = 0.5*(U[i,j] + U[i+1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i+1,j,4])/2))*\
-            (P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
-        massFlows[i,j,1] = 0.5*(U[i,j] + U[i-1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i-1,j,4])/2))*\
-            (P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
-        massFlows[i,j,2] = 0.5*(V[i,j] + V[i,j+1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j+1,4])/2))*\
-            (P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
-        massFlows[i,j,3] = V[i,j-1]
+        massFlows[i,j,0] = Rhie_Chow(U[i,j], U[i+1,j], dy, coeffsUV[i,j,4], \
+            coeffsUV[i+1,j,4], P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
+        massFlows[i,j,1] = Rhie_Chow(U[i,j], U[i-1,j], dy, coeffsUV[i,j,4], \
+            coeffsUV[i-1,j,4], P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
+        massFlows[i,j,2] = Rhie_Chow(V[i,j], V[i,j+1], dx, coeffsUV[i,j,4], \
+            coeffsUV[i,j+1,4], P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
+        massFlows[i,j,3] = V[i,j-1] 
     
     # Second, East and West
     for j in range(2,nI-2):
         # East
         i = -2;
         massFlows[i,j,0] = U[i+1,j]
-        massFlows[i,j,1] = 0.5*(U[i,j] + U[i-1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i-1,j,4])/2))*\
-            (P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
-        massFlows[i,j,2] = 0.5*(V[i,j] + V[i,j+1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j+1,4])/2))*\
-            (P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
-        massFlows[i,j,3] = 0.5*(V[i,j] + V[i,j-1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j-1,4])/2))*\
-            (P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2])
+        massFlows[i,j,1] = Rhie_Chow(U[i,j], U[i-1,j], dy, coeffsUV[i,j,4], \
+            coeffsUV[i-1,j,4], P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
+        massFlows[i,j,2] = Rhie_Chow(V[i,j], V[i,j+1], dx, coeffsUV[i,j,4], \
+            coeffsUV[i,j+1,4], P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
+        massFlows[i,j,3] = Rhie_Chow(V[i,j], V[i,j-1], dx, coeffsUV[i,j,4], \
+            coeffsUV[i,j-1,4], P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2]) 
             
         # West
         i = 1;
-        massFlows[i,j,0] = 0.5*(U[i,j] + U[i+1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i+1,j,4])/2))*\
-            (P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
+        massFlows[i,j,0] = Rhie_Chow(U[i,j], U[i+1,j], dy, coeffsUV[i,j,4], \
+            coeffsUV[i+1,j,4], P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
         massFlows[i,j,1] = U[i-1,j]
-        massFlows[i,j,2] = 0.5*(V[i,j] + V[i,j+1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j+1,4])/2))*\
-            (P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
-        massFlows[i,j,3] = 0.5*(V[i,j] + V[i,j-1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j-1,4])/2))*\
-            (P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2])
+        massFlows[i,j,2] = Rhie_Chow(V[i,j], V[i,j+1], dx, coeffsUV[i,j,4], \
+            coeffsUV[i,j+1,4], P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
+        massFlows[i,j,3] = Rhie_Chow(V[i,j], V[i,j-1], dx, coeffsUV[i,j,4], \
+            coeffsUV[i,j-1,4], P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2]) 
     
     # North-West Corner
     i = 1; j = -2;
-    massFlows[i,j,0] = 0.5*(U[i,j] + U[i+1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i+1,j,4])/2))*\
-        (P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
+    massFlows[i,j,0] = Rhie_Chow(U[i,j], U[i+1,j], dy, coeffsUV[i,j,4], \
+        coeffsUV[i+1,j,4], P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
     massFlows[i,j,1] = U[i-1,j]
     massFlows[i,j,2] = V[i,j+1]
-    massFlows[i,j,3] = 0.5*(V[i,j] + V[i,j-1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j-1,4])/2))*\
-        (P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2])
+    massFlows[i,j,3] = Rhie_Chow(V[i,j], V[i,j-1], dx, coeffsUV[i,j,4], \
+        coeffsUV[i,j-1,4], P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2]) 
     
     # North-East Corner
     i = -2; j = -2; 
     massFlows[i,j,0] = U[i+1,j]
-    massFlows[i,j,1] = 0.5*(U[i,j] + U[i-1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i-1,j,4])/2))*\
-        (P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
+    massFlows[i,j,1] = Rhie_Chow(U[i,j], U[i-1,j], dy, coeffsUV[i,j,4], \
+        coeffsUV[i-1,j,4], P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
     massFlows[i,j,2] = V[i,j+1]
-    massFlows[i,j,3] = 0.5*(V[i,j] + V[i,j-1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j-1,4])/2))*\
-        (P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2])
+    massFlows[i,j,3] = Rhie_Chow(V[i,j], V[i,j-1], dx, coeffsUV[i,j,4], \
+        coeffsUV[i,j-1,4], P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2]) 
     
     # South-West Corner
     i = 1; j = 1;
-    massFlows[i,j,0] = 0.5*(U[i,j] + U[i+1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i+1,j,4])/2))*\
-        (P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
+    massFlows[i,j,0] = Rhie_Chow(U[i,j], U[i+1,j], dy, coeffsUV[i,j,4], \
+        coeffsUV[i+1,j,4], P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
     massFlows[i,j,1] = U[i-1,j]
-    massFlows[i,j,2] = 0.5*(V[i,j] + V[i,j+1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j+1,4])/2))*\
-        (P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
+    massFlows[i,j,2] = Rhie_Chow(V[i,j], V[i,j+1], dx, coeffsUV[i,j,4], \
+        coeffsUV[i,j+1,4], P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
     massFlows[i,j,3] = V[i,j-1]
     
     # South-East Corner
     i = -2; j = 1;
     massFlows[i,j,0] = U[i+1,j]
-    massFlows[i,j,1] = 0.5*(U[i,j] + U[i-1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i-1,j,4])/2))*\
-        (P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
-    massFlows[i,j,2] = 0.5*(V[i,j] + V[i,j+1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j+1,4])/2))*\
-        (P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
-    massFlows[i,j,3] = V[i,j-1]
+    massFlows[i,j,1] = Rhie_Chow(U[i,j], U[i-1,j], dy, coeffsUV[i,j,4], \
+        coeffsUV[i-1,j,4], P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
+    massFlows[i,j,2] = Rhie_Chow(V[i,j], V[i,j+1], dx, coeffsUV[i,j,4], \
+        coeffsUV[i,j+1,4], P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
+    massFlows[i,j,3] = V[i,j-1] 
     
     # Inner Nodes
     for i in range(2,nI-2):
         for j in range(2,nJ-2): 
-            massFlows[i,j,0] = 0.5*(U[i,j] + U[i+1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i+1,j,4])/2))*\
-                (P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
-            massFlows[i,j,1] = 0.5*(U[i,j] + U[i-1,j]) + (dy/(4*(coeffsUV[i,j,4] + coeffsUV[i-1,j,4])/2))*\
-                (P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
-            massFlows[i,j,2] = 0.5*(V[i,j] + V[i,j+1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j+1,4])/2))*\
-                (P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
-            massFlows[i,j,3] = 0.5*(V[i,j] + V[i,j-1]) + (dx/(4*(coeffsUV[i,j,4] + coeffsUV[i,j-1,4])/2))*\
-                (P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2])
+            massFlows[i,j,0] = Rhie_Chow(U[i,j], U[i+1,j], dy, coeffsUV[i,j,4], \
+                coeffsUV[i+1,j,4], P[i+2,j] - 3*P[i+1,j] + 3*P[i,j] + P[i-1,j])
+            massFlows[i,j,1] = Rhie_Chow(U[i,j], U[i-1,j], dy, coeffsUV[i,j,4], \
+                coeffsUV[i-1,j,4], P[i+1,j] - 3*P[i,j] + 3*P[i-1,j] + P[i-2,j])
+            massFlows[i,j,2] = Rhie_Chow(V[i,j], V[i,j+1], dx, coeffsUV[i,j,4], \
+                coeffsUV[i,j+1,4], P[i,j+2] - 3*P[i,j+1] + 3*P[i,j] + P[i,j-1])
+            massFlows[i,j,3] = Rhie_Chow(V[i,j], V[i,j-1], dx, coeffsUV[i,j,4], \
+                coeffsUV[i,j-1,4], P[i,j+1] - 3*P[i,j] + 3*P[i,j-1] + P[i,j-2]) 
     
     ### SIMPLE - 2. Pressure Correction
     ## Calculate pressure correction equation coefficients 
-    Pp_x = rho*dy*dy
-    Pp_y = rho*dx*dx
+    Pp_x = rho*dy*dy*alphaUV
+    Pp_y = rho*dx*dx*alphaUV
     # First, North and South
     for i in range(2,nI-2):
         # North
@@ -442,7 +448,7 @@ for iter in range(nIterations):
     sourcePp[i,j]   = - rho*(massFlows[i,j,0] - massFlows[i,j,1])*dy - \
         rho*(massFlows[i,j,2] - massFlows[i,j,3])*dx 
     
-    # Innder nodes
+    # Inner nodes
     for i in range(2,nI-2):
         for j in range(2,nJ-2):
             coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
@@ -450,52 +456,70 @@ for iter in range(nIterations):
             coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
             coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
             coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] + coeffsPp[i,j,3]
-            sourcePp[i,j]   = - rho*(massFlows[i,j,0] - massFlows[i,j,1])*dy - \
-                rho*(massFlows[i,j,2] - massFlows[i,j,3])*dx 
+            sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1])*rho*dy - \
+                (massFlows[i,j,2] - massFlows[i,j,3])*rho*dx 
+            
        
     # Solve for pressure correction (Note that more that one loop is used)
     for iter_gs in range(n_inner_iterations_gs):
         for j in range(1,nJ-1):
             for i in range(1,nI-1):    
-                # Remark: Slow?
-                if i == 2 and j == 2:
-                    Pp[2,2] = 0
-                else:
-                    Pp[i,j] = (coeffsPp[i,j,0] * Pp[i+1,j] + coeffsPp[i,j,1] * Pp[i-1,j] \
+                Pp[i,j] = (coeffsPp[i,j,0] * Pp[i+1,j] + coeffsPp[i,j,1] * Pp[i-1,j] \
                       + coeffsPp[i,j,2] * Pp[i,j+1] + coeffsPp[i,j,3] * Pp[i,j-1] + sourcePp[i,j])/coeffsPp[i,j,4]
                
-    # Set Pp with reference to node (2,2) and copy to boundaries, : Why Here?!
+    # Set Pp with reference to node (2,2) and copy to boundaries
+    Pp[1:-1,1:-1] -= Pp[1,1]
     
     ### SIMPLE - 3. Correct U,V,P
-    ### Question: Correct mass flow as well?
     # Correct velocities, pressure and mass flows, : Mass flow needed?
     for i in range(1,nI-1):
         for j in range(1,nJ-1): 
             P[i,j] += alphaP*Pp[i,j] 
-            U[i,j] = U[i,j] + (dy*alphaUV/coeffsUV[i,j,4])*(P[i-1,j] - P[i+1,j])
-            V[i,j] = V[i,j] + (dx*alphaUV/coeffsUV[i,j,4])*(P[i,j-1] - P[i,j+1])
-            #massFlows 
+            U[i,j] += (dy*alphaUV*(Pp[i-1,j] - Pp[i+1,j])/2)/((coeffsUV[i,j,4] + coeffsUV[i,j,4])/2)
+            V[i,j] += (dx*alphaUV*(Pp[i,j-1] - Pp[i,j+1])/2)/((coeffsUV[i,j,4] + coeffsUV[i,j,4])/2)
             
+            ### Correct mass flow here?
+            # (massFlows[5,5,0] - massFlows[5,5,1]) + (massFlows[5,5,2] - massFlows[5,5,3])
     
     # impose zero mass flow at the boundaries :  
-    
+    V[:,-1] = 0 # North
+    U[:,0]  = 0 # U South
+    V[:,0]  = 0 # V South
+    U[-1,:] = 0 # U East
+    V[-1,:] = 0 # V East
+    U[0,:]  = 0 # U West
+    V[0,:]  = 0 # U West
+        
     # Copy P to boundaries
-    P[0,:] = P[1,:]
+    P[0,:]  = P[1,:]
     P[-1,:] = P[-2,:]
-    P[:,0] = P[:,1]
+    P[:,0]  = P[:,1]
     P[:,-1] = P[:,-2]
     
     ### Compute Residuals
-    # Compute residuals
-    residuals_U.append(0) # U momentum residual
-    residuals_V.append(0) # V momentum residual
-    residuals_c.append(0) # continuity residual
+    
+    rU = 0
+    rV = 0
+    for j in range(1,nJ-1):
+        for i in range(1,nI-1):
+            rhsU = coeffsUV[i,j,0]*U[i-1,j] + coeffsUV[i,j,1]*U[i+1,j] + \
+            coeffsUV[i,j,2]*U[i,j-1] + coeffsUV[i,j,3]*U[i,j+1]
+            rU += np.abs(coeffsUV[i,j,4]*U[i,j] - rhsU)
+            
+            rhsV = coeffsUV[i,j,0]*V[i-1,j] + coeffsUV[i,j,1]*V[i+1,j] + \
+            coeffsUV[i,j,2]*V[i,j-1] + coeffsUV[i,j,3]*V[i,j+1]
+            rV += np.abs(coeffsUV[i,j,4]*V[i,j] - rhsV)
+            
+    residuals_U.append(rU) # U momentum residual
+    residuals_V.append(rV) # V momentum residual
+    residuals_c.append(1) # continuity residual
 
-    for i in range(1,nI-1):
-        for j in range(1,nJ-1):
-            residuals_U[-1] = 1
-            residuals_V[-1] = 1
-            residuals_c[-1] = 1
+# =============================================================================
+#     residuals_U[-1] = rU
+#     residuals_V[-1] = rV
+#     residuals_c[-1] = 1
+# =============================================================================
+    nIter.append(iter)
 
     print('iteration: %d\nresU = %.5e, resV = %.5e, resCon = %.5e\n\n'\
         % (iter, residuals_U[-1], residuals_V[-1], residuals_c[-1]))
@@ -549,6 +573,18 @@ plt.xlabel('x [m]')
 plt.ylabel('y [m]')
 plt.quiver(xCoords_N,yCoords_N,U,V)
 
+# Residuals
+plt.subplot(2,3,6)
+plt.plot(nIter[1:-1],residuals_U[1:-1], "red")
+plt.plot(nIter[1:-1],residuals_V[1:-1], "green")
+plt.plot(nIter[1:-1],residuals_c[1:-1], "yellow")
+plt.title('Residual convergence')
+plt.xlabel('iterations')
+plt.ylabel('residuals [-]')
+#plt.legend('U momentum','V momentum', 'Continuity')
+plt.title('Residuals')
+plt.show()
+
 # =============================================================================
 # # Comparison with data
 # data=np.genfromtxt(data_file, skip_header=1)
@@ -582,7 +618,6 @@ plt.quiver(xCoords_N,yCoords_N,U,V)
 # #plt.legend('U momentum','V momentum', 'Continuity')
 # plt.title('Residuals')
 # plt.show()
-# 
 # =============================================================================
 
 
