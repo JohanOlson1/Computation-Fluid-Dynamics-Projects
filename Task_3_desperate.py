@@ -1056,3 +1056,304 @@ for iter in range(nIterations):
                 + coeffsUV[i,j,3]
             sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
             sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
+            
+            
+            
+            
+       ### backup Pp     
+    # First, North and South
+    for i in range(2,nI-2):
+        # North
+        j = -2
+        coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
+        coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
+        coeffsPp[i,j,2] = 0
+        coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
+        coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
+            + coeffsPp[i,j,3]
+        sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+            (massFlows[i,j,2] - massFlows[i,j,3]) 
+        
+        # South
+        j = 1
+        coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
+        coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
+        coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
+        coeffsPp[i,j,3] = 0
+        coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
+            + coeffsPp[i,j,3]
+        sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+            (massFlows[i,j,2] - massFlows[i,j,3]) 
+        
+    # Second, East and West
+    for j in range(2,nJ-2):
+        # East
+        i = -2
+        coeffsPp[i,j,0] = 0
+        coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
+        coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
+        coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
+        coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
+            + coeffsPp[i,j,3]
+        sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+            (massFlows[i,j,2] - massFlows[i,j,3]) 
+            
+        # West
+        i = 1
+        coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
+        coeffsPp[i,j,1] = 0
+        coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
+        coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
+        coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
+            + coeffsPp[i,j,3]
+        sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+            (massFlows[i,j,2] - massFlows[i,j,3]) 
+        
+    # North-West Corner
+    i = 1; j = -2;
+    coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
+    coeffsPp[i,j,1] = 0
+    coeffsPp[i,j,2] = 0
+    coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
+    coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
+        + coeffsPp[i,j,3]
+    sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+        (massFlows[i,j,2] - massFlows[i,j,3]) 
+        
+    # North-East Corner
+    i = -2; j = -2;
+    coeffsPp[i,j,0] = 0
+    coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
+    coeffsPp[i,j,2] = 0
+    coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
+    coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
+        + coeffsPp[i,j,3]
+    sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+        (massFlows[i,j,2] - massFlows[i,j,3]) 
+        
+    # South-West
+    i = 1; j = 1;
+    coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
+    coeffsPp[i,j,1] = 0
+    coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
+    coeffsPp[i,j,3] = 0
+    coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] 
+    + coeffsPp[i,j,3]
+    sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+        (massFlows[i,j,2] - massFlows[i,j,3]) 
+    
+    # South-East
+    i = -2; j = 1;
+    coeffsPp[i,j,0] = 0
+    coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
+    coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
+    coeffsPp[i,j,3] = 0
+    coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
+        + coeffsPp[i,j,3]
+    sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+        (massFlows[i,j,2] - massFlows[i,j,3])
+    
+    # Inner nodes
+    for i in range(2,nI-2):
+        for j in range(2,nJ-2):
+            coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
+            coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
+            coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
+            coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
+            coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
+                + coeffsPp[i,j,3]
+            sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+                (massFlows[i,j,2] - massFlows[i,j,3]) 
+                
+                
+                
+                ## backup coeffUV
+                
+                
+    for i in range(2,nI-2):
+        
+        # North
+        j = -2
+        coeffsUV[i,j,0] = Dx + max([0, -massFlows[i,j,0]])
+        coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
+        coeffsUV[i,j,2] = 0
+        coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
+        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
+            + coeffsUV[i,j,3]  \
+                    + (2*Dy + max([ - massFlows[i,j,2],0])) 
+        sourceUV[i,j,0] = (P[i-1,j] - P[i+1,j])*dy/2 + (2*Dy \
+                  + max([-massFlows[i,j, 2],0]))*U[i,j+1]
+        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
+        
+        # South
+        j = 1
+        coeffsUV[i,j,0] = Dx + max([0, -massFlows[i,j,0]])
+        coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
+        coeffsUV[i,j,2] = Dy + max([0, -massFlows[i,j,2]])
+        coeffsUV[i,j,3] = 0
+        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
+          + coeffsUV[i,j,3] 
+        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
+        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2 
+        
+    # Second, east and west boundaries
+    for j in range(2,nJ-2):
+        # East
+        i = -2
+        coeffsUV[i,j,0] = 0
+        coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
+        coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
+        coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
+        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
+           + coeffsUV[i,j,3] 
+        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
+        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2 
+        
+        # West
+        i = 1
+        coeffsUV[i,j,0] = Dx + max([0, -massFlows[i,j,0]])
+        coeffsUV[i,j,1] = 0
+        coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
+        coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
+        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
+           + coeffsUV[i,j,3] 
+        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
+        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2 
+         
+    ## Compute coefficients at corner nodes (one step inside)
+    
+    # North-West Corner
+    i = 1; j = -2;
+    coeffsUV[i,j,0] = Dx + max([0,- massFlows[i,j,0]])
+    coeffsUV[i,j,1] = 0
+    coeffsUV[i,j,2] = 0
+    coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
+    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
+       + coeffsUV[i,j,3]  \
+               + (2*Dy + max([-massFlows[i,j,2],0])) 
+    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2 \
+        + (2*Dy + max([-massFlows[i,j,2],0]))*U[i,j+1]
+    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2 
+    
+    # North-East Corner
+    i = -2; j = -2;
+    coeffsUV[i,j,0] = 0
+    coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
+    coeffsUV[i,j,2] = 0
+    coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
+    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
+        + coeffsUV[i,j,3]  \
+                + (2*Dy + max([-massFlows[i,j,2],0]))
+    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2 \
+        + (2*Dy + max([-massFlows[i,j,2],0]))*U[i,j+1]
+    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
+    
+    # South-West Corner
+    i = 1; j = 1; 
+    coeffsUV[i,j,0] = Dx + max([0,- massFlows[i,j,0]])
+    coeffsUV[i,j,1] = 0
+    coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
+    coeffsUV[i,j,3] = 0
+    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
+        + coeffsUV[i,j,3]     
+    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
+    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2   
+    
+    # South-East Corner
+    i = -2; j = 1;
+    coeffsUV[i,j,0] = 0
+    coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
+    coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
+    coeffsUV[i,j,3] = 0
+    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
+        + coeffsUV[i,j,3]   
+    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
+    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2    
+    
+    ## Compute coefficients for inner nodes
+    for i in range(2,nI-2):
+        for j in range(2,nJ-2):
+            coeffsUV[i,j,0] = Dx + max([0,- massFlows[i,j,0]])
+            coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
+            coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
+            coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
+            coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
+                + coeffsUV[i,j,3]
+            sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
+            sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2      
+            
+            
+            
+     ### backup FOU       
+
+    for i in range(1,nI-1):
+        for j in range(1,nJ-1):
+            
+            if ( i < nI-2): # East
+                coeffsUV[i,j,0] = nu*rho*dy_CV[i,j]/dxe_N[i,j] + max([0, -massFlows[i,j,0]])
+            
+            if ( i > 1):    # West
+                coeffsUV[i,j,1] = nu*rho*dy_CV[i,j]/dxw_N[i,j] + max([massFlows[i,j,1], 0])
+                
+            if ( j < nJ-2): # North
+                coeffsUV[i,j,2] = nu*rho*dx_CV[i,j]/dyn_N[i,j] + max([0,- massFlows[i,j,2]])
+            
+            if ( j > 1):    # South
+                coeffsUV[i,j,3] = nu*rho*dx_CV[i,j]/dys_N[i,j] + max([massFlows[i,j,3], 0])
+            
+            # Center
+            coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] \
+                + coeffsUV[i,j,2] + coeffsUV[i,j,3]
+        
+            # Source
+            sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy_CV[i,j]/2
+            sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx_CV[i,j]/2
+            
+            
+    # North Boundary Dirichlet
+    for i in range(1,nI-1):
+        j = -2
+        coeffsUV[i,j,4] += (nu*rho*dx_CV[i,j]/dyn_N[i,j] + max([ - massFlows[i,j,2], 0]))
+        sourceUV[i,j,0] += (nu*rho*dx_CV[i,j]/dyn_N[i,j] + max([ - massFlows[i,j,2], 0]))*U[i,j+1]
+
+
+
+
+## backup hybrid
+
+
+    for i in range(1,nI-1):
+        for j in range(1,nJ-1):
+            
+            if ( i < nI-2): # East
+                coeffsUV[i,j,0] = max([-massFlows[i,j,0], nu*rho*dy_CV[i,j]/dxe_N[i,j] \
+                                       - massFlows[i,j,0]/2, 0])
+            
+            if ( i > 1):    # West
+                coeffsUV[i,j,1] = max([massFlows[i,j,1], nu*rho*dy_CV[i,j]/dxw_N[i,j] \
+                                       + massFlows[i,j,1]/2, 0])
+                
+            if ( j < nJ-2): # North
+                coeffsUV[i,j,2] = max([-massFlows[i,j,2], nu*rho*dx_CV[i,j]/dyn_N[i,j] \
+                                       - massFlows[i,j,2]/2, 0])
+            
+            if ( j > 1):    # South
+                coeffsUV[i,j,3] = max([massFlows[i,j,3], nu*rho*dx_CV[i,j]/dys_N[i,j] \
+                                       + massFlows[i,j,3]/2, 0])
+            
+            # Center
+            coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] \
+                + coeffsUV[i,j,2] + coeffsUV[i,j,3]
+        
+            # Source
+            sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy_CV[i,j]/2
+            sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx_CV[i,j]/2
+            
+            
+    # North Boundary Dirichlet
+    for i in range(1,nI-1):
+        j = -2
+        coeffsUV[i,j,4] += max([-massFlows[i,j,2], nu*rho*dx_CV[i,j]/dyn_N[i,j] \
+                                       - massFlows[i,j,2]/2, 0])
+        sourceUV[i,j,0] += max([-massFlows[i,j,2], nu*rho*dx_CV[i,j]/dyn_N[i,j] \
+                                       - massFlows[i,j,2]/2, 0])*U[i,j+1]

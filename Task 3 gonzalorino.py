@@ -15,13 +15,16 @@ import numpy as np
 ### Inputs
 
 # Fluid properties and B. C. inputs
-
 UWall = 1 # velocity of the upper wall
 rho   = 1 # density
 nu    = 0.001 # kinematic viscosity
 
-data_file = 'data_FOU_CD.txt' # data file where the given solution is stored
+differencing_scheme = 'FOU' # 'Hybrid' or 'FOU'
 
+if ( differencing_scheme == 'Hybrid'):
+    data_file = 'data_Hybrid.txt' # data file where the given solution is stored
+else:
+    data_file = 'data_FOU_CD.txt' # data file where the given solution is stored
 # Geometric inputs (fixed so that a fair comparison can be made)
 
 mI = 11 # number of mesh points X direction. 
@@ -131,132 +134,112 @@ U[:,:] = 0
 V[:,:] = 0
 P[:,:] = 0
 
-Dx = nu*rho*dy/dx
-Dy = nu*rho*dx/dy
-
 U[:,-1] = 1
 
 # ================ Looping =======================
 ### Iteration start
-
 for iter in range(nIterations):
     ### U,V Coefficents
-    # First, north and south boundaries
-    ### Question: U and V in all
-    
-    for i in range(2,nI-2):
-        
-        # North
-        j = -2
-        coeffsUV[i,j,0] = Dx + max([0, -massFlows[i,j,0]])
-        coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
-        coeffsUV[i,j,2] = 0
-        coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
-        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
-            + coeffsUV[i,j,3]  \
-                    + (2*Dy + max([massFlows[i,j,2],0])) 
-        sourceUV[i,j,0] = (P[i-1,j] - P[i+1,j])*dy + (2*Dy \
-                  + max([massFlows[i,j, 2],0]))*U[i,j+1]
-        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
-        
-        # South
-        j = 1
-        coeffsUV[i,j,0] = Dx + max([0, -massFlows[i,j,0]])
-        coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
-        coeffsUV[i,j,2] = Dy + max([0, -massFlows[i,j,2]])
-        coeffsUV[i,j,3] = 0
-        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
-          + coeffsUV[i,j,3] 
-        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2 
-        
-    # Second, east and west boundaries
-    for j in range(2,nJ-2):
-        # East
-        i = -2
-        coeffsUV[i,j,0] = 0
-        coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
-        coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
-        coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
-        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
-           + coeffsUV[i,j,3] 
-        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2 
-        
-        # West
-        i = 1
-        coeffsUV[i,j,0] = Dx + max([0, -massFlows[i,j,0]])
-        coeffsUV[i,j,1] = 0
-        coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
-        coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
-        coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
-           + coeffsUV[i,j,3] 
-        sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-        sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2 
+
+    # Hybrid Scheme
+    if ( differencing_scheme == 'Hybrid'):
+        for i in range(1,nI-1):
+            for j in range(1,nJ-1):
+                if ( i < nI-2): # East
+                    coeffsUV[i,j,0] = max([-massFlows[i,j,0], nu*rho*dy_CV[i,j]\
+                                           /dxe_N[i,j] - massFlows[i,j,0]/2, 0])     
+                if ( i > 1):    # West
+                    coeffsUV[i,j,1] = max([massFlows[i,j,1], nu*rho*dy_CV[i,j]\
+                                           /dxw_N[i,j] + massFlows[i,j,1]/2, 0])             
+                if ( j < nJ-2): # North
+                    coeffsUV[i,j,2] = max([-massFlows[i,j,2], nu*rho*dx_CV[i,j]\
+                                           /dyn_N[i,j] - massFlows[i,j,2]/2, 0])   
+                if ( j > 1):    # South
+                    coeffsUV[i,j,3] = max([massFlows[i,j,3], nu*rho*dx_CV[i,j]\
+                                           /dys_N[i,j] + massFlows[i,j,3]/2, 0])
+                # Center
+                coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] \
+                    + coeffsUV[i,j,2] + coeffsUV[i,j,3]
+                # Source
+                sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy_CV[i,j]/2
+                sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx_CV[i,j]/2
+                # North Boundary Dirichlet
+        for i in range(1,nI-1):
+            j = -2
+            coeffsUV[i,j,4] += max([-massFlows[i,j,2], nu*rho*dx_CV[i,j]/dyn_N[i,j] \
+                                           - massFlows[i,j,2]/2, 0])
+            sourceUV[i,j,0] += max([-massFlows[i,j,2], nu*rho*dx_CV[i,j]/dyn_N[i,j] \
+                                           - massFlows[i,j,2]/2, 0])*U[i,j+1]
+                
+            # South
+            j = 1
+            coeffsUV[i,j,4] += nu*rho*dx_CV[i,j]/dys_N[i,j]
+            sourceUV[i,j,0] += nu*rho*dx_CV[i,j]/dys_N[i,j] * 0
          
-    ## Compute coefficients at corner nodes (one step inside)
+        # East and West                     
+        for j in range(1,nJ-1):
+            # East
+            i = -2
+            coeffsUV[i,j,4] += nu*rho*dy_CV[i,j]/dxe_N[i,j]
+            sourceUV[i,j,1] += nu*rho*dy_CV[i,j]/dxe_N[i,j] * 0
+            
+            # West
+            i = 1
+            coeffsUV[i,j,4] += nu*rho*dy_CV[i,j]/dxw_N[i,j] 
+            sourceUV[i,j,1] += nu*rho*dy_CV[i,j]/dxw_N[i,j] * 0
+  
+    # Forward upwind scheme   
+    if ( differencing_scheme == 'FOU'):
+        for i in range(1,nI-1):
+            for j in range(1,nJ-1):
+                if ( i < nI-2): # East
+                    coeffsUV[i,j,0] = nu*rho*dy_CV[i,j]/dxe_N[i,j] \
+                        + max([0, -massFlows[i,j,0]])
+                if ( i > 1):    # West
+                    coeffsUV[i,j,1] = nu*rho*dy_CV[i,j]/dxw_N[i,j] \
+                        + max([massFlows[i,j,1], 0])
+                if ( j < nJ-2): # North
+                    coeffsUV[i,j,2] = nu*rho*dx_CV[i,j]/dyn_N[i,j] \
+                        + max([0,- massFlows[i,j,2]])
+                if ( j > 1):    # South
+                    coeffsUV[i,j,3] = nu*rho*dx_CV[i,j]/dys_N[i,j] \
+                        + max([massFlows[i,j,3], 0])
+                # Center
+                coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] \
+                    + coeffsUV[i,j,2] + coeffsUV[i,j,3] \
+                        + massFlows[i,j,0] - massFlows[i,j,1] \
+                            + massFlows[i,j,2] - massFlows[i,j,3]
+                # Source
+                sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy_CV[i,j]/2
+                sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx_CV[i,j]/2
+        # North and South Boundary Dirichlet
+        for i in range(1,nI-1):
+            # North
+            j = -2
+            coeffsUV[i,j,4] += (nu*rho*dx_CV[i,j]/dyn_N[i,j] \
+                                + max([ - massFlows[i,j,2], 0]))
+            sourceUV[i,j,0] += (nu*rho*dx_CV[i,j]/dyn_N[i,j] \
+                                + max([ - massFlows[i,j,2], 0]))*U[i,j+1]
+            # South
+            j = 1
+            coeffsUV[i,j,4] += nu*rho*dx_CV[i,j]/dys_N[i,j]
+            sourceUV[i,j,0] += nu*rho*dx_CV[i,j]/dys_N[i,j] * 0
+         
+        # East and West                     
+        for j in range(1,nJ-1):
+            # East
+            i = -2
+            coeffsUV[i,j,4] += nu*rho*dy_CV[i,j]/dxe_N[i,j]
+            sourceUV[i,j,1] += nu*rho*dy_CV[i,j]/dxe_N[i,j] * 0
+            
+            # West
+            i = 1
+            coeffsUV[i,j,4] += nu*rho*dy_CV[i,j]/dxw_N[i,j] 
+            sourceUV[i,j,1] += nu*rho*dy_CV[i,j]/dxw_N[i,j] * 0
+            
+            
     
-    # North-West Corner
-    i = 1; j = -2;
-    coeffsUV[i,j,0] = Dx + max([0,- massFlows[i,j,0]])
-    coeffsUV[i,j,1] = 0
-    coeffsUV[i,j,2] = 0
-    coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
-    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
-       + coeffsUV[i,j,3]  \
-               + (2*Dy + max([massFlows[i,j,2],0])) 
-    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2 \
-        + (2*Dy + max([massFlows[i,j,2],0]))*U[i,j+1]
-    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2 
-    
-    # North-East Corner
-    i = -2; j = -2;
-    coeffsUV[i,j,0] = 0
-    coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
-    coeffsUV[i,j,2] = 0
-    coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
-    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
-        + coeffsUV[i,j,3]  \
-                + (2*Dy + max([massFlows[i,j,2],0]))
-    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2 \
-        + (2*Dy + max([massFlows[i,j,2],0]))*U[i,j+1]
-    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
-    
-    # South-West Corner
-    i = 1; j = 1; 
-    coeffsUV[i,j,0] = Dx + max([0,- massFlows[i,j,0]])
-    coeffsUV[i,j,1] = 0
-    coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
-    coeffsUV[i,j,3] = 0
-    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
-        + coeffsUV[i,j,3]     
-    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2   
-    
-    # South-East Corner
-    i = -2; j = 1;
-    coeffsUV[i,j,0] = 0
-    coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
-    coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
-    coeffsUV[i,j,3] = 0
-    coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
-        + coeffsUV[i,j,3]   
-    sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-    sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2    
-    
-    ## Compute coefficients for inner nodes
-    for i in range(2,nI-2):
-        for j in range(2,nJ-2):
-            coeffsUV[i,j,0] = Dx + max([0,- massFlows[i,j,0]])
-            coeffsUV[i,j,1] = Dx + max([massFlows[i,j,1], 0])
-            coeffsUV[i,j,2] = Dy + max([0,- massFlows[i,j,2]])
-            coeffsUV[i,j,3] = Dy + max([massFlows[i,j,3], 0])
-            coeffsUV[i,j,4] = coeffsUV[i,j,0] + coeffsUV[i,j,1] + coeffsUV[i,j,2] \
-                + coeffsUV[i,j,3]
-            sourceUV[i,j,0] = (P[i-1,j]-P[i+1,j])*dy/2
-            sourceUV[i,j,1] = (P[i,j-1]-P[i,j+1])*dx/2
-        
-    ### Implicit Under-Relaxation 
+            
     ### SIMPLE - 1. U*,V*
     ## Solve for U* and V* using Gauss-Seidel
     for i in range(1,nI-1):
@@ -265,6 +248,7 @@ for iter in range(nIterations):
                     + coeffsUV[i,j,2] * U[i,j+1] + coeffsUV[i,j,3] * U[i,j-1] \
                         + sourceUV[i,j,0])/coeffsUV[i,j,4] \
                             + (1-alphaUV)*U[i,j]
+                            
             V[i,j] = alphaUV*(coeffsUV[i,j,0] * V[i+1,j] + coeffsUV[i,j,1] * V[i-1,j] \
                     + coeffsUV[i,j,2] * V[i,j+1] + coeffsUV[i,j,3] * V[i,j-1] \
                         + sourceUV[i,j,1])/coeffsUV[i,j,4] \
@@ -273,133 +257,40 @@ for iter in range(nIterations):
     ## Calculate at the faces using Rhie-Chow for the face velocities
     for i in range(1,nI-1):
         for j in range(1,nJ-1):
-            if (i<nI-2): # I exclude the last internal cell (nI-1) for F_e calculation as it is zero, since F_e of nI-1 is a wall.
-                      # also I would run out of bounds when trying to get
-                      # P_EE (nI+1)
-                massFlows[i,j,0] = rho*((U[i+1,j]+U[i,j])/2+dy_CV[i,j]/(4*coeffsUV[i,j,4])*(P[i+2,j]-3*P[i+1,j]+3*P[i,j]-P[i-1,j]))*dy_CV[i,j] # % east convective
-            else:
-                massFlows[i,j,0] = 0; # therefore last internal cell I set to zero directly (wall)
+            if (i<nI-2):
+                massFlows[i,j,0] = rho*((U[i+1,j]+U[i,j])/2+dy_CV[i,j]\
+                    /(4*coeffsUV[i,j,4])*(P[i+2,j]-3*P[i+1,j]+3*P[i,j]-P[i-1,j]))*dy_CV[i,j] 
+            massFlows[i,j,1] = massFlows[i-1,j,0] 
             
-            massFlows[i,j,1] = massFlows[i-1,j,0] #; % F_w of cell i is equal to F_e of i-1, therefore I copy to avoid typos
-            if (j<nJ-2): #% I exclude the last internal cell (nJ-1) for F_n calculation as it is zero, since F_n of nJ-1 is a wall.
-                      # also I would run out of bounds when trying to get
-                      # P_NN (nJ+1)
-                massFlows[i,j,2] = rho*((V[i,j+1]+V[i,j])/2+dx_CV[i,j]/(4*coeffsUV[i,j,4])*(P[i,j+2]-3*P[i,j+1]+3*P[i,j]-P[i,j-1]))*dx_CV[i,j] #; % north convective
-            else:
-                massFlows[i,j,3] = 0 
-            
-            massFlows[i,j,3] = massFlows[i,j-1,2] #; % F_s of cell j is equal to F_n of j-1, therefore I copy to avoid typos
-    
+            if (j<nJ-2): 
+                massFlows[i,j,2] = rho*((V[i,j+1]+V[i,j])/2+dx_CV[i,j]\
+                    /(4*coeffsUV[i,j,4])*(P[i,j+2]-3*P[i,j+1]+3*P[i,j]-P[i,j-1]))*dx_CV[i,j] 
+            massFlows[i,j,3] = massFlows[i,j-1,2] 
     
     ### SIMPLE - 2. Pressure Correction
     ## Calculate pressure correction equation coefficients 
-    Pp_x = rho*dy*dy*alphaUV
-    Pp_y = rho*dx*dx*alphaUV
-    # First, North and South
-    for i in range(2,nI-2):
-        # North
-        j = -2
-        coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
-        coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
-        coeffsPp[i,j,2] = 0
-        coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
-        coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
-            + coeffsPp[i,j,3]
-        sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
-            (massFlows[i,j,2] - massFlows[i,j,3]) 
-        
-        # South
-        j = 1
-        coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
-        coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
-        coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
-        coeffsPp[i,j,3] = 0
-        coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
-            + coeffsPp[i,j,3]
-        sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
-            (massFlows[i,j,2] - massFlows[i,j,3]) 
-        
-    # Second, East and West
-    for j in range(2,nJ-2):
-        # East
-        i = -2
-        coeffsPp[i,j,0] = 0
-        coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
-        coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
-        coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
-        coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
-            + coeffsPp[i,j,3]
-        sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
-            (massFlows[i,j,2] - massFlows[i,j,3]) 
-            
-        # West
-        i = 1
-        coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
-        coeffsPp[i,j,1] = 0
-        coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
-        coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
-        coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
-            + coeffsPp[i,j,3]
-        sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
-            (massFlows[i,j,2] - massFlows[i,j,3]) 
-        
-    # North-West Corner
-    i = 1; j = -2;
-    coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
-    coeffsPp[i,j,1] = 0
-    coeffsPp[i,j,2] = 0
-    coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
-    coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
-        + coeffsPp[i,j,3]
-    sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
-        (massFlows[i,j,2] - massFlows[i,j,3]) 
-        
-    # North-East Corner
-    i = -2; j = -2;
-    coeffsPp[i,j,0] = 0
-    coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
-    coeffsPp[i,j,2] = 0
-    coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
-    coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
-        + coeffsPp[i,j,3]
-    sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
-        (massFlows[i,j,2] - massFlows[i,j,3]) 
-        
-    # South-West
-    i = 1; j = 1;
-    coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
-    coeffsPp[i,j,1] = 0
-    coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
-    coeffsPp[i,j,3] = 0
-    coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] 
-    + coeffsPp[i,j,3]
-    sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
-        (massFlows[i,j,2] - massFlows[i,j,3]) 
-    
-    # South-East
-    i = -2; j = 1;
-    coeffsPp[i,j,0] = 0
-    coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
-    coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
-    coeffsPp[i,j,3] = 0
-    coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
-        + coeffsPp[i,j,3]
-    sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
-        (massFlows[i,j,2] - massFlows[i,j,3])
-    
-    # Inner nodes
-    for i in range(2,nI-2):
-        for j in range(2,nJ-2):
-            coeffsPp[i,j,0] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
-            coeffsPp[i,j,1] = Pp_x/((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
-            coeffsPp[i,j,2] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
-            coeffsPp[i,j,3] = Pp_y/((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
-            coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
-                + coeffsPp[i,j,3]
-            sourcePp[i,j]   = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
+    for i in range(1,nI-1):
+        for j in range(1,nJ-1):
+            if( i < nI-2): # East
+                coeffsPp[i,j,0] = (alphaUV*rho*dy_CV[i,j]**2)\
+                    /((coeffsUV[i,j,4]+coeffsUV[i+1,j,4])/2)
+            if ( i > 1):   # West
+                coeffsPp[i,j,1] = (alphaUV*rho*dy_CV[i,j]**2)\
+                    /((coeffsUV[i,j,4]+coeffsUV[i-1,j,4])/2)
+            if ( j < nJ-2):# North
+                coeffsPp[i,j,2] = (alphaUV*rho*dx_CV[i,j]**2)\
+                    /((coeffsUV[i,j,4]+coeffsUV[i,j+1,4])/2)
+            if ( j > 1):   # South
+                coeffsPp[i,j,3] = (alphaUV*rho*dx_CV[i,j]**2)\
+                    /((coeffsUV[i,j,4]+coeffsUV[i,j-1,4])/2)
+                
+            sourcePp[i,j] = - (massFlows[i,j,0] - massFlows[i,j,1]) - \
                 (massFlows[i,j,2] - massFlows[i,j,3]) 
             
-       
+            coeffsPp[i,j,4] = coeffsPp[i,j,0] + coeffsPp[i,j,1] + coeffsPp[i,j,2] \
+            + coeffsPp[i,j,3]
+      
+    Pp[:,:] = 0   
     # Solve for pressure correction (Note that more that one loop is used)
     for iter_gs in range(n_inner_iterations_gs):
         for j in range(1,nJ-1):
@@ -409,7 +300,7 @@ for iter in range(nIterations):
                           + sourcePp[i,j])/coeffsPp[i,j,4]
                
     # Set Pp with reference to node (2,2) and copy to boundaries
-    Pp[:,:] -= Pp[5,5]
+    Pp[:,:] -= Pp[1,1]
     
     # Copy Pp to boundaries
     Pp[0,:]  = Pp[1,:]
@@ -417,27 +308,22 @@ for iter in range(nIterations):
     Pp[:,0]  = Pp[:,1]
     Pp[:,-1] = Pp[:,-2]
     
-    
     ### SIMPLE - 3. Correct U,V,P
     # Correct velocities, pressure and mass flows, : Mass flow needed?
     for i in range(1,nI-1):
         for j in range(1,nJ-1): 
-            P[i,j] += alphaP*Pp[i,j] 
-
-    for i in range(1,nI-1):
-        for j in range(1,nJ-1): 
+            P[i,j] += alphaP*Pp[i,j]  
             U[i,j] += (dy*alphaUV*(Pp[i-1,j] - Pp[i+1,j])/2)/(coeffsUV[i,j,4])
             V[i,j] += (dx*alphaUV*(Pp[i,j-1] - Pp[i,j+1])/2)/(coeffsUV[i,j,4])  
 
-
     # impose zero mass flow at the boundaries :  
-    V[:,-1] = 0 # V North
-    U[:,0]  = 0 # U South
-    V[:,0]  = 0 # V South
-    U[-1,1:-2] = 0 # U East
-    V[-1,:] = 0 # V East
-    U[0,1:-2]  = 0 # U West
-    V[0,:]  = 0 # V West
+    V[:,-1] = 0     # V North
+    U[:,0]  = 0     # U South
+    V[:,0]  = 0     # V South
+    U[-1,1:-2] = 0  # U East
+    V[-1,:] = 0     # V East
+    U[0,1:-2] = 0   # U West
+    V[0,:]  = 0     # V West
     
     # Copy P to boundaries
     P[0,:]  = P[1,:]
@@ -445,28 +331,19 @@ for iter in range(nIterations):
     P[:,0]  = P[:,1]
     P[:,-1] = P[:,-2]
 
-    
     for i in range(1,nI-1):
         for j in range(1,nJ-1):
-            if (i<nI-2): # I exclude the last internal cell (nI-1) for F_e calculation as it is zero, since F_e of nI-1 is a wall.
-                      # also I would run out of bounds when trying to get
-                      # P_EE (nI+1)
-                massFlows[i,j,0] = rho*((U[i+1,j]+U[i,j])/2+dy_CV[i,j]/(4*coeffsUV[i,j,4])*(P[i+2,j]-3*P[i+1,j]+3*P[i,j]-P[i-1,j]))*dy_CV[i,j] # % east convective
-            else:
-                massFlows[i,j,0] = 0; # therefore last internal cell I set to zero directly (wall)
+            if (i<nI-2):
+                massFlows[i,j,0] = rho*((U[i+1,j]+U[i,j])/2+dy_CV[i,j]\
+                    /(4*coeffsUV[i,j,4])*(P[i+2,j]-3*P[i+1,j]+3*P[i,j]-P[i-1,j]))*dy_CV[i,j] 
+            massFlows[i,j,1] = massFlows[i-1,j,0] 
             
-            massFlows[i,j,1] = massFlows[i-1,j,0] #; % F_w of cell i is equal to F_e of i-1, therefore I copy to avoid typos
-            if (j<nJ-2): #% I exclude the last internal cell (nJ-1) for F_n calculation as it is zero, since F_n of nJ-1 is a wall.
-                      # also I would run out of bounds when trying to get
-                      # P_NN (nJ+1)
-                massFlows[i,j,2] = rho*((V[i,j+1]+V[i,j])/2+dx_CV[i,j]/(4*coeffsUV[i,j,4])*(P[i,j+2]-3*P[i,j+1]+3*P[i,j]-P[i,j-1]))*dx_CV[i,j] #; % north convective
-            else:
-                massFlows[i,j,3] = 0 #; % therefore last internal cell I set to zero directly (wall)
-            
-            massFlows[i,j,3] = massFlows[i,j-1,2] #; % F_s of cell j is equal to F_n of j-1, therefore I copy to avoid typos
+            if (j<nJ-2): 
+                massFlows[i,j,2] = rho*((V[i,j+1]+V[i,j])/2+dx_CV[i,j]\
+                    /(4*coeffsUV[i,j,4])*(P[i,j+2]-3*P[i,j+1]+3*P[i,j]-P[i,j-1]))*dx_CV[i,j] 
+            massFlows[i,j,3] = massFlows[i,j-1,2] 
     
     ### Compute Residuals
-    
     rU = 0
     rV = 0
     rc = 0
@@ -480,7 +357,8 @@ for iter in range(nIterations):
             coeffsUV[i,j,2]*V[i,j+1] + coeffsUV[i,j,3]*V[i,j-1] + sourceUV[i,j,1]
             rV += np.abs(coeffsUV[i,j,4]*V[i,j] - rhsV)
             
-            rc += np.abs(massFlows[i,j,0] - massFlows[i,j,1] + massFlows[i,j,2] - massFlows[i,j,3])
+            rc += np.abs(massFlows[i,j,0] - massFlows[i,j,1] \
+                         + massFlows[i,j,2] - massFlows[i,j,3])
             
     residuals_U.append(rU) # U momentum residual
     residuals_V.append(rV) # V momentum residual
